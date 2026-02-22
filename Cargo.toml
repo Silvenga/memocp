@@ -1,0 +1,22 @@
+[package]
+name = "memocp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5.60", features = ["derive"] }
+redb = "3.1.0"
+tracing = { version = "0.1.44", features = ["log"] }
+env_logger = "0.11.9"
+log-panics = { version = "2.1.0", features = ["with-backtrace"] }
+tokio = { version = "1.49.0", features = ["full"] }
+blake3 = "1.8.3"
+anyhow = "1.0.102"
+memmap2 = "0.9.10"
+fs4 = "0.13.1"
+thiserror = "2.0.18"
+
+[dev-dependencies]
+assert_fs = "1.1.3"
+predicates = "3.1.4"
+assert_matches = "1.5.0"
