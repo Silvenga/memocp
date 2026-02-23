@@ -8,7 +8,7 @@ mod cli;
 mod config;
 mod db;
 mod runner;
-mod hasher;
+mod scanning;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         })
         .init();
 
-    let runner = Runner::new(config)?;
+    let runner = Runner::new(config).await?;
     runner.run().await;
 
     Ok(())

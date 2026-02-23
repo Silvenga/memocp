@@ -8,8 +8,8 @@ pub struct Runner {
 }
 
 impl Runner {
-    pub fn new(config: Config) -> Result<Self, Box<dyn Error>> {
-        let db = Db::open(config.state.clone())?;
+    pub async fn new(config: Config) -> Result<Self, Box<dyn Error>> {
+        let db = Db::open_file(config.state_path.clone()).await?;
         Ok(Self { config, db })
     }
 

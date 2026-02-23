@@ -15,6 +15,8 @@ anyhow = "1.0.102"
 memmap2 = "0.9.10"
 fs4 = "0.13.1"
 thiserror = "2.0.18"
+borsh = { version = "1.6.0", features = ["derive"] }
+arrayvec = "0.7.6"
 
 [dev-dependencies]
 assert_fs = "1.1.3"
