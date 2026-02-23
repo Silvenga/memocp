@@ -2,7 +2,7 @@ use crate::scanning::hashing::Hash;
 use borsh::{BorshDeserialize, BorshSerialize};
 use redb::{TypeName, Value};
 
-#[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SeenRecord {
     pub source_path: String,
     pub destination_path: String,

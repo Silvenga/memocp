@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::task;
 use tracing::debug;
 
-const SEEN_TABLE: TableDefinition<&str, SeenRecord> = TableDefinition::new("v1_seen");
+const SEEN_TABLE: TableDefinition<Hash, SeenRecord> = TableDefinition::new("v1_seen");
 const CACHE_TABLE: TableDefinition<&str, CacheRecord> = TableDefinition::new("v1_cache");
 
 #[derive(Clone)]
@@ -118,6 +118,65 @@ impl Db {
         .await?
     }
 
+    pub async fn get_seen(&self, hash: Hash) -> anyhow::Result<Option<SeenRecord>> {
+        task::spawn_blocking({
+            let db = self.db.clone();
+            move || -> anyhow::Result<Option<SeenRecord>> {
+                let read_txn = db.begin_read()?;
+                let table = read_txn.open_table(SEEN_TABLE)?;
+                if let Some(result) = table.get(hash)? {
+                    return Ok(Some(result.value()));
+                }
+                Ok(None)
+            }
+        })
+        .await?
+    }
+
+    pub async fn exists_seen(&self, hash: Hash) -> anyhow::Result<bool> {
+        task::spawn_blocking({
+            let db = self.db.clone();
+            move || -> anyhow::Result<bool> {
+                let read_txn = db.begin_read()?;
+                let table = read_txn.open_table(SEEN_TABLE)?;
+                Ok(table.get(hash)?.is_some())
+            }
+        })
+        .await?
+    }
+
+    pub async fn set_seen(&self, record: SeenRecord) -> anyhow::Result<()> {
+        task::spawn_blocking({
+            let db = self.db.clone();
+            move || -> anyhow::Result<()> {
+                let write_txn = db.begin_write()?;
+                {
+                    let mut table = write_txn.open_table(SEEN_TABLE)?;
+                    table.insert(record.file_hash, &record)?;
+                }
+                write_txn.commit()?;
+                Ok(())
+            }
+        })
+        .await?
+    }
+
+    pub async fn remove_seen(&self, hash: Hash) -> anyhow::Result<()> {
+        task::spawn_blocking({
+            let db = self.db.clone();
+            move || -> anyhow::Result<()> {
+                let write_txn = db.begin_write()?;
+                {
+                    let mut table = write_txn.open_table(SEEN_TABLE)?;
+                    table.remove(hash)?;
+                }
+                write_txn.commit()?;
+                Ok(())
+            }
+        })
+        .await?
+    }
+
     pub async fn create_tables(&self) -> anyhow::Result<()> {
         task::spawn_blocking({
             let db = self.db.clone();
@@ -167,5 +226,68 @@ mod tests {
         db.remove_source_hash(path).await.unwrap();
         let result = db.try_get_source_hash(path, 10, 20, 30).await.unwrap();
         assert_matches!(result, None);
+    }
+
+    #[tokio::test]
+    pub async fn when_seen_doesnt_exist_then_get_seen_should_return_none() {
+        let db = Db::open_in_memory().await.unwrap();
+        let hash = Hash::default();
+        let result = db.get_seen(hash).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    pub async fn when_seen_exists_then_get_seen_should_return_some() {
+        let db = Db::open_in_memory().await.unwrap();
+        let hash = Hash::default();
+        let record = SeenRecord {
+            source_path: "foo".to_string(),
+            destination_path: "bar".to_string(),
+            file_size_bytes: 123,
+            file_modified_time: 456,
+            file_created_time: 789,
+            file_hash: hash,
+            copied_time: 101112,
+        };
+        db.set_seen(record.clone()).await.unwrap();
+        let result = db.get_seen(hash).await.unwrap();
+        assert_eq!(result, Some(record));
+    }
+
+    #[tokio::test]
+    pub async fn when_seen_exists_then_exists_seen_should_return_true() {
+        let db = Db::open_in_memory().await.unwrap();
+        let hash = Hash::default();
+        let record = SeenRecord {
+            source_path: "foo".to_string(),
+            destination_path: "bar".to_string(),
+            file_size_bytes: 123,
+            file_modified_time: 456,
+            file_created_time: 789,
+            file_hash: hash,
+            copied_time: 101112,
+        };
+        db.set_seen(record).await.unwrap();
+        let result = db.exists_seen(hash).await.unwrap();
+        assert!(result);
+    }
+
+    #[tokio::test]
+    pub async fn when_seen_exists_then_remove_seen_should_remove_record() {
+        let db = Db::open_in_memory().await.unwrap();
+        let hash = Hash::default();
+        let record = SeenRecord {
+            source_path: "foo".to_string(),
+            destination_path: "bar".to_string(),
+            file_size_bytes: 123,
+            file_modified_time: 456,
+            file_created_time: 789,
+            file_hash: hash,
+            copied_time: 101112,
+        };
+        db.set_seen(record).await.unwrap();
+        db.remove_seen(hash).await.unwrap();
+        let result = db.get_seen(hash).await.unwrap();
+        assert!(result.is_none());
     }
 }

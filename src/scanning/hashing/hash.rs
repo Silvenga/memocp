@@ -21,6 +21,10 @@ impl Hash {
     pub fn empty_hash() -> Self {
         Self::new(Blake3Hash::from([0; 32]))
     }
+
+    pub fn into_bytes(self) -> [u8; 32] {
+        self.hash.into()
+    }
 }
 
 impl Default for Hash {
