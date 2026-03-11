@@ -1,4 +1,4 @@
-use crate::scanning::hashing::Hash;
+use crate::hashing::Hash;
 use blake3::{Hash as Blake3Hash, OUT_LEN};
 use redb::{Key, TypeName, Value};
 use std::cmp::Ordering;

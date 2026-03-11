@@ -1,12 +1,12 @@
-use crate::scanning::hashing::Hash;
+use crate::hashing::Hash;
 use borsh::{BorshDeserialize, BorshSerialize};
 use redb::{TypeName, Value};
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq)]
 pub struct CacheRecord {
     pub file_size_bytes: u64,
-    pub file_modified_time: u64,
-    pub file_created_time: u64,
+    pub file_modified_time: u128,
+    pub file_created_time: u128,
     pub file_hash: Hash,
 }
 

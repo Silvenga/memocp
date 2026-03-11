@@ -1,4 +1,4 @@
-use crate::scanning::hashing::Hash;
+use crate::hashing::Hash;
 use borsh::{BorshDeserialize, BorshSerialize};
 use redb::{TypeName, Value};
 
