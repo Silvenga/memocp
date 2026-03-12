@@ -12,7 +12,7 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::Instrument;
 
-const MAX_SCANNING_QUEUE_SIZE: usize = 1_000;
+const MAX_SCANNING_QUEUE_SIZE: usize = 100_000;
 
 pub struct Runner {
     config: Config,
