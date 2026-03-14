@@ -4,7 +4,6 @@ use clap::Parser;
 use std::error::Error;
 use tracing::level_filters::LevelFilter;
 use tracing_indicatif::IndicatifLayer;
-use tracing_subscriber::fmt;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -14,6 +13,8 @@ mod db;
 mod hashing;
 mod runner;
 mod scanner;
+mod file_metadata;
+mod templating;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -43,7 +44,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     log_panics::init();
 
     let runner = Runner::new(config).await?;
-    runner.run().await;
+    runner.run().await?;
 
     Ok(())
 }

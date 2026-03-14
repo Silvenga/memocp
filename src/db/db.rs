@@ -24,8 +24,8 @@ impl Db {
         Ok(db)
     }
 
-    pub async fn open_file(path: String) -> anyhow::Result<Self> {
-        debug!("Acquiring lock of state database at {}.", path);
+    pub async fn open_file(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        debug!("Acquiring lock of state database at {:?}.", path.as_ref());
         Self::open(Database::create(path)?).await
     }
 

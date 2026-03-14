@@ -6,11 +6,12 @@ use crate::scanner::Scanner;
 use futures::StreamExt;
 use std::error::Error;
 use std::path::PathBuf;
-use std::slice;
 use std::sync::Arc;
+use tokio::io;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::Instrument;
+use crate::templating::Templater;
 
 const MAX_SCANNING_QUEUE_SIZE: usize = 100_000;
 
@@ -25,20 +26,21 @@ impl Runner {
         Ok(Self { config, db })
     }
 
-    pub async fn run(&self) {
-        let (tx, rx) = mpsc::channel::<PathBuf>(MAX_SCANNING_QUEUE_SIZE);
+    pub async fn run(&self) -> anyhow::Result<()> {
+        let source_path = self.get_source_path()?;
 
-        let scanner = Scanner::default()
-            .with_ignore_hidden(self.config.ignore_hidden)
-            .with_source_paths(slice::from_ref(&self.config.source_path));
-
-        let scanner_task = scanner.scan(tx);
+        let scanner = Scanner::new(&source_path)
+            .with_globs(self.config.glob.iter().cloned().collect())
+            .with_ignore_hidden(self.config.ignore_hidden);
 
         let hasher = Hasher::default()
             .with_take_exclusive_lock(self.config.exclusive_lock)
             .with_read_chunk_size(self.config.hashing_read_chunk_size.as_u64());
-        let copier = Arc::from(Copier::new(self.db.clone(), hasher));
+        let templater = Templater::new(&source_path, &self.config.destination_path);
+        let copier = Arc::from(Copier::new(self.db.clone(), hasher, templater));
 
+        let (tx, rx) = mpsc::channel::<PathBuf>(MAX_SCANNING_QUEUE_SIZE);
+        let scanner_task = scanner.scan(tx);
         let processing_tasks =
             ReceiverStream::new(rx).for_each_concurrent(self.config.concurrency, {
                 let copier = copier.clone();
@@ -64,6 +66,11 @@ impl Runner {
                 }
             });
 
-        tokio::join!(scanner_task, processing_tasks);
+        let (scanner_result, _) = tokio::join!(scanner_task, processing_tasks);
+        scanner_result
+    }
+
+    fn get_source_path(&self) -> io::Result<PathBuf> {
+        dunce::canonicalize(&self.config.source_path)
     }
 }

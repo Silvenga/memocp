@@ -1,45 +1,62 @@
 use ignore::WalkBuilder;
-use std::path::PathBuf;
+use ignore::overrides::OverrideBuilder;
+use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
 use tokio::task;
 
-#[derive(Default)]
 pub struct Scanner {
-    source_paths: Vec<String>,
+    source_path: PathBuf,
+    globs: Vec<String>,
     ignore_hidden: bool,
 }
 
 impl Scanner {
-    pub fn with_source_paths(mut self, source_paths: &[String]) -> Self {
-        self.source_paths = source_paths.to_vec();
+    pub fn new(source_path: impl AsRef<Path>) -> Self {
+        Self {
+            source_path: source_path.as_ref().to_owned(),
+            globs: Vec::default(),
+            ignore_hidden: false,
+        }
+    }
+
+    pub fn with_globs(mut self, globs: Vec<String>) -> Self {
+        self.globs = globs;
         self
     }
+
     pub fn with_ignore_hidden(mut self, ignore_hidden: bool) -> Self {
         self.ignore_hidden = ignore_hidden;
         self
     }
 
-    pub async fn scan(&self, tx: mpsc::Sender<PathBuf>) {
-        let [first_source, other_sources @ ..] = self.source_paths.as_slice() else {
-            return;
+    pub async fn scan(&self, tx: mpsc::Sender<PathBuf>) -> anyhow::Result<()> {
+        tracing::debug!(
+            "Source scanning started in {:?}, hidden files ignored: {}.",
+            self.source_path,
+            self.ignore_hidden
+        );
+
+        let walker = {
+            let mut builder = WalkBuilder::new(&self.source_path);
+            builder.sort_by_file_path(|a, b| a.cmp(b));
+            builder.hidden(self.ignore_hidden);
+
+            let overrides = {
+                let mut builder = OverrideBuilder::new(&self.source_path);
+                builder.case_insensitive(true)?;
+                for glob in &self.globs {
+                    builder.add(glob)?;
+                }
+                builder.build()
+            }?;
+            builder.overrides(overrides);
+
+            builder.build()
         };
+
         task::spawn_blocking({
-            let first_source = first_source.clone();
-            let other_sources = other_sources.to_vec();
-            let ignore_hidden = self.ignore_hidden;
             move || {
                 let _span = tracing::info_span!("Scanning source paths").entered();
-
-                let walker = {
-                    let mut builder = WalkBuilder::new(&first_source);
-                    builder.sort_by_file_path(|a, b| a.cmp(b));
-                    builder.hidden(ignore_hidden);
-                    for source in &other_sources {
-                        builder.add(source);
-                    }
-                    builder.build()
-                };
-                tracing::debug!("Source scanning started in {first_source} and [{other_sources:?}], hidden files ignored: {ignore_hidden}.");
 
                 let mut total = 0u64;
                 for result in walker {
@@ -62,7 +79,8 @@ impl Scanner {
                 tracing::info!("Source scanning complete, discovered {total} files.");
             }
         })
-        .await
-        .unwrap();
+        .await?;
+
+        Ok(())
     }
 }

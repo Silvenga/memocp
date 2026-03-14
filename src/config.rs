@@ -9,9 +9,14 @@ pub struct Config {
     #[arg(index = 1, required = true)]
     pub source_path: String,
 
-    /// The destination/file directory to copy to.
+    /// The destination/file directory to copy to. If this does not exist, it will be created.
     #[arg(index = 2, required = true)]
     pub destination_path: String,
+
+    /// The glob pattern to use for filtering files. Ignored if the source path is a file.
+    /// Globs are matched case-insensitively.
+    #[arg(long)]
+    pub glob: Option<String>,
 
     /// The state file to use for memoization.
     #[arg(short, long, default_value_t = default_state_file())]
