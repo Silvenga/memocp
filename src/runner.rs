@@ -1,8 +1,10 @@
-use crate::cloning::{Copier, CopyStats};
+use crate::cloning::Copier;
 use crate::config::Config;
 use crate::db::Db;
 use crate::hashing::Hasher;
+use crate::processor::Processor;
 use crate::scanner::Scanner;
+use crate::stats::Stats;
 use crate::templating::Templater;
 use bytesize::ByteSize;
 use futures::StreamExt;
@@ -40,33 +42,42 @@ impl Runner {
             .with_take_exclusive_lock(self.config.exclusive_lock)
             .with_read_chunk_size(self.config.hashing_read_chunk_size.as_u64());
 
-        let templater = Templater::new(&source_path, &self.config.destination_path);
+        let copier = if self.config.load
+            && let Some(destination_path) = &self.config.destination_path
+        {
+            let templater = Templater::new(&source_path, destination_path);
+            let copier = Copier::new(&self.db, templater)
+                .with_copy_op(self.config.copy_mode)
+                .with_override_existing(self.config.override_existing);
+            Some(copier)
+        } else {
+            None
+        };
 
-        let copier = Copier::new(self.db.clone(), hasher, templater)
-            .with_copy_op(self.config.copy_mode)
-            .with_override_existing(self.config.override_existing);
+        let processor = Processor::new(&self.db, hasher, copier);
 
-        let copy_stats = Arc::from(CopyStats::default());
+        let stats = Arc::from(Stats::default());
 
         let start_time = Instant::now();
 
         let (tx, rx) = mpsc::channel::<PathBuf>(MAX_SCANNING_QUEUE_SIZE);
         let scanner_task = scanner.scan(tx);
+
         let processing_tasks =
             ReceiverStream::new(rx).for_each_concurrent(self.config.concurrency, {
-                let copier = Arc::from(copier);
-                let copy_stats = copy_stats.clone();
+                let processor = Arc::from(processor);
+                let stats = stats.clone();
                 move |file| {
-                    let copier = copier.clone();
-                    let copy_stats = copy_stats.clone();
+                    let processor = processor.clone();
+                    let stats = stats.clone();
                     let span = tracing::info_span!(
                         "Processing file",
                         file = file.to_string_lossy().to_string()
                     );
                     async move {
-                        match copier.copy(&file).await {
+                        match processor.process(&file).await {
                             Ok(result) => {
-                                copy_stats.process(&result);
+                                stats.process(&result);
                             }
                             Err(e) => {
                                 tracing::warn!(
@@ -84,7 +95,7 @@ impl Runner {
         let (scanner_result, _) = tokio::join!(scanner_task, processing_tasks);
 
         if scanner_result.is_ok() {
-            let stats = copy_stats.get_stats();
+            let stats = stats.get_stats();
             tracing::info!(
                 "Processed {} files ({}) in {}.",
                 stats.total_files,

@@ -10,10 +10,12 @@ use tracing_subscriber::util::SubscriberInitExt;
 mod cloning;
 mod config;
 mod db;
-mod file_metadata;
 mod hashing;
+mod models;
+mod processor;
 mod runner;
 mod scanner;
+mod stats;
 mod templating;
 
 #[tokio::main]

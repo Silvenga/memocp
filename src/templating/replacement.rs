@@ -1,9 +1,9 @@
-use crate::file_metadata::FileMetadata;
+use crate::models::FileMetadata;
 use chrono::{DateTime, Datelike, Local, TimeZone, Utc};
 use strum_macros::EnumIter;
 use thiserror::Error;
 
-#[derive(EnumIter)]
+#[derive(EnumIter, Debug)]
 pub enum Replacement {
     UtcModifiedYear,
     UtcModifiedMonth,
@@ -15,7 +15,7 @@ pub enum Replacement {
 
 impl Replacement {
     pub fn can_replace(&self, template: impl AsRef<str>) -> bool {
-        template.as_ref().contains(self.get_variable_name())
+        template.as_ref().contains(self.get_token())
     }
 
     pub fn replace(
@@ -23,12 +23,12 @@ impl Replacement {
         template: impl AsRef<str>,
         metadata: &FileMetadata,
     ) -> Result<String, ReplacementError> {
-        let name = self.get_variable_name();
+        let token = self.get_token();
         let value = self.get_value(metadata)?;
-        Ok(template.as_ref().replace(name, &value))
+        Ok(template.as_ref().replace(token, &value))
     }
 
-    fn get_variable_name(&self) -> &'static str {
+    fn get_token(&self) -> &'static str {
         match self {
             Self::UtcModifiedYear => "{year_utc}",
             Self::UtcModifiedMonth => "{month_utc}",

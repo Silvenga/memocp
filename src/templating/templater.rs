@@ -1,4 +1,4 @@
-use crate::file_metadata::FileMetadata;
+use crate::models::FileMetadata;
 use crate::templating::template::Template;
 use std::path::{Path, PathBuf};
 

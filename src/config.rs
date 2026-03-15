@@ -7,12 +7,12 @@ use std::{env, thread};
 #[command(version, about, long_about = None)]
 pub struct Config {
     /// The source directory/file to copy from.
-    #[arg(index = 1, required = true)]
+    #[arg(index = 1)]
     pub source_path: String,
 
     /// The destination/file directory to copy to. If the directory does not exist, it will be created.
-    #[arg(index = 2, required = true)]
-    pub destination_path: String,
+    #[arg(index = 2, required_unless_present_any = ["load"])]
+    pub destination_path: Option<String>,
 
     /// The glob pattern to use for filtering files. Ignored if the source path is a file.
     /// Globs are matched case-insensitively.
@@ -54,6 +54,10 @@ pub struct Config {
     /// The copy mode to use.
     #[arg(long = "mode", value_enum, default_value_t = CopyOp::Reflink, ignore_case = true)]
     pub copy_mode: CopyOp,
+
+    /// Scan the source directory/file to populate the database of "seen" file hashes without copying files.
+    #[arg(long)]
+    pub load: bool,
 }
 
 fn default_concurrency() -> usize {

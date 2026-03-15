@@ -1,8 +1,9 @@
-use crate::cloning::{CopyResult, FileCacheResult, FileCopyResult};
+use crate::cloning::FileCopyResult;
+use crate::processor::{FileCacheResult, FileResult};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(Default)]
-pub struct CopyStats {
+pub struct Stats {
     cache_bytes_new: AtomicU64,
     cache_files_new: AtomicU64,
     cache_bytes_modified: AtomicU64,
@@ -16,8 +17,8 @@ pub struct CopyStats {
     files_skipped: AtomicU64,
 }
 
-impl CopyStats {
-    pub fn process(&self, result: &CopyResult) {
+impl Stats {
+    pub fn process(&self, result: &FileResult) {
         match result.cache_result {
             FileCacheResult::New => {
                 self.cache_file_new(result.metadata.file_size_bytes);

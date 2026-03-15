@@ -1,4 +1,4 @@
-use crate::file_metadata::FileMetadata;
+use crate::models::FileMetadata;
 use crate::templating::replacement::{Replacement, ReplacementError};
 use strum::IntoEnumIterator;
 
@@ -9,9 +9,18 @@ pub struct Template {
 
 impl Template {
     pub fn build(template: impl AsRef<str>) -> Self {
+        let template = template.as_ref().to_owned();
+        let replacements = Self::get_replacements(&template);
+
+        tracing::trace!(
+            "Built template with {} replacements active: {:?}.",
+            replacements.len(),
+            replacements
+        );
+
         Self {
-            template: template.as_ref().to_owned(),
-            replacements: Self::get_replacements(template),
+            template,
+            replacements,
         }
     }
 
