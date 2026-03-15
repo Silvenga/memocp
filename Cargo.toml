@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.5.60", features = ["derive"] }
-redb = "3.1.0"
+clap = { version = "4.6.0", features = ["derive"] }
+redb = "3.1.1"
 tracing = { version = "0.1.44", features = ["log"] }
 log-panics = { version = "2.1.0", features = ["with-backtrace"] }
-tokio = { version = "1.49.0", features = ["full"] }
+tokio = { version = "1.50.0", features = ["full"] }
 blake3 = "1.8.3"
 anyhow = "1.0.102"
 fs4 = "0.13.1"
@@ -19,11 +19,14 @@ ignore = "0.4.25"
 tokio-stream = "0.1.18"
 futures = "0.3.32"
 tracing-indicatif = "0.3.14"
-tracing-subscriber = "0.3.22"
+tracing-subscriber = "0.3.23"
 dunce = "1.0.5"
-strum = "0.28"
+reflink-copy = "0.1.19"
+uuid = { version = "1.22.0", features = ["v4"] }
+strum = "0.28.0"
 strum_macros = "0.28"
 chrono = "0.4.44"
+humantime = "2.3.0"
 
 [dev-dependencies]
 assert_fs = "1.1.3"

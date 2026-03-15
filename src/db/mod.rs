@@ -2,5 +2,5 @@
 mod db;
 mod records;
 
-pub use db::Db;
+pub use db::*;
 pub use records::*;

@@ -5,12 +5,12 @@ use thiserror::Error;
 
 #[derive(EnumIter)]
 pub enum Replacement {
-    UtcYear,
-    UtcMonth,
-    UtcDay,
-    LocalYear,
-    LocalMonth,
-    LocalDay,
+    UtcModifiedYear,
+    UtcModifiedMonth,
+    UtcModifiedDay,
+    LocalModifiedYear,
+    LocalModifiedMonth,
+    LocalModifiedDay,
 }
 
 impl Replacement {
@@ -30,33 +30,33 @@ impl Replacement {
 
     fn get_variable_name(&self) -> &'static str {
         match self {
-            Self::UtcYear => "{year_utc}",
-            Self::UtcMonth => "{month_utc}",
-            Self::UtcDay => "{day_utc}",
-            Self::LocalYear => "{year_local}",
-            Self::LocalMonth => "{month_local}",
-            Self::LocalDay => "{day_local}",
+            Self::UtcModifiedYear => "{year_utc}",
+            Self::UtcModifiedMonth => "{month_utc}",
+            Self::UtcModifiedDay => "{day_utc}",
+            Self::LocalModifiedYear => "{year_local}",
+            Self::LocalModifiedMonth => "{month_local}",
+            Self::LocalModifiedDay => "{day_local}",
         }
     }
 
     fn get_value(&self, metadata: &FileMetadata) -> Result<String, ReplacementError> {
         let result = match self {
-            Replacement::UtcYear => get_date_time(metadata.file_created_time, Utc)?
+            Replacement::UtcModifiedYear => get_date_time(metadata.file_modified_time, Utc)?
                 .year()
                 .to_string(),
-            Replacement::UtcMonth => get_date_time(metadata.file_created_time, Utc)?
+            Replacement::UtcModifiedMonth => get_date_time(metadata.file_modified_time, Utc)?
                 .month()
                 .to_string(),
-            Replacement::UtcDay => get_date_time(metadata.file_created_time, Utc)?
+            Replacement::UtcModifiedDay => get_date_time(metadata.file_modified_time, Utc)?
                 .day()
                 .to_string(),
-            Replacement::LocalYear => get_date_time(metadata.file_created_time, Local)?
+            Replacement::LocalModifiedYear => get_date_time(metadata.file_modified_time, Local)?
                 .year()
                 .to_string(),
-            Replacement::LocalMonth => get_date_time(metadata.file_created_time, Local)?
+            Replacement::LocalModifiedMonth => get_date_time(metadata.file_modified_time, Local)?
                 .month()
                 .to_string(),
-            Replacement::LocalDay => get_date_time(metadata.file_created_time, Local)?
+            Replacement::LocalModifiedDay => get_date_time(metadata.file_modified_time, Local)?
                 .day()
                 .to_string(),
         };

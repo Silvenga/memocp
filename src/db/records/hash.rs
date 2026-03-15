@@ -23,7 +23,7 @@ impl Value for Hash {
     where
         Self: 'b,
     {
-        value.hash.into()
+        value.into_bytes()
     }
 
     fn type_name() -> TypeName {

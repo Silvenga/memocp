@@ -1,3 +1,4 @@
+use crate::cloning::CopyOp;
 use bytesize::ByteSize;
 use clap::Parser;
 use std::{env, thread};
@@ -9,7 +10,7 @@ pub struct Config {
     #[arg(index = 1, required = true)]
     pub source_path: String,
 
-    /// The destination/file directory to copy to. If this does not exist, it will be created.
+    /// The destination/file directory to copy to. If the directory does not exist, it will be created.
     #[arg(index = 2, required = true)]
     pub destination_path: String,
 
@@ -26,7 +27,8 @@ pub struct Config {
     #[arg(short, long, default_value_t = false)]
     pub verbose: bool,
 
-    /// The number of threads to use for hashing and copying. A single thread will be used for scanning.
+    /// The maximum number of threads to use for hashing and copying.
+    /// An additional thread will always be used for scanning.
     /// Defaults to `8` or the number of CPU cores, whichever is smaller.
     #[arg(long, default_value_t = default_concurrency())]
     pub concurrency: usize,
@@ -44,6 +46,14 @@ pub struct Config {
     /// Ignore hidden files.
     #[arg(long)]
     pub ignore_hidden: bool,
+
+    /// Override existing files at the destination.
+    #[arg(long = "override")]
+    pub override_existing: bool,
+
+    /// The copy mode to use.
+    #[arg(long = "mode", value_enum, default_value_t = CopyOp::Reflink, ignore_case = true)]
+    pub copy_mode: CopyOp,
 }
 
 fn default_concurrency() -> usize {

@@ -7,13 +7,13 @@ use tracing_indicatif::IndicatifLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
+mod cloning;
 mod config;
-mod copier;
 mod db;
+mod file_metadata;
 mod hashing;
 mod runner;
 mod scanner;
-mod file_metadata;
 mod templating;
 
 #[tokio::main]

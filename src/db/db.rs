@@ -41,14 +41,14 @@ impl Db {
         file_size_bytes: u64,
         file_modified_time: u128,
         file_created_time: u128,
-    ) -> anyhow::Result<Option<Hash>> {
+    ) -> anyhow::Result<GetSourceHashResult> {
         if !path.as_ref().is_absolute() {
             return Err(DbError::PathMustBeAbsolute.into());
         }
         task::spawn_blocking({
             let db = self.db.clone();
             let path = path.as_ref().to_owned();
-            move || -> anyhow::Result<Option<Hash>> {
+            move || -> anyhow::Result<GetSourceHashResult> {
                 let read_txn = db.begin_read()?;
                 let table = read_txn.open_table(CACHE_TABLE)?;
                 if let Some(result) = table.get(path.as_os_str().as_encoded_bytes())? {
@@ -58,16 +58,17 @@ impl Db {
                         && record.file_created_time == file_created_time
                     {
                         let file_hash = record.file_hash;
-                        // PERF: as_string when debugging disabled?
                         debug!(
                             "[{path:?}]: Found matching source hash {}.",
                             file_hash.as_string()
                         );
-                        return Ok(Some(file_hash));
+                        return Ok(GetSourceHashResult::Hit { hash: file_hash });
                     }
+                    debug!("[{path:?}]: File modified.");
+                    return Ok(GetSourceHashResult::Modified);
                 }
                 debug!("[{path:?}]: No matching source hash found.");
-                Ok(None)
+                Ok(GetSourceHashResult::Miss)
             }
         })
         .await?
@@ -202,6 +203,13 @@ pub enum DbError {
     PathMustBeAbsolute,
 }
 
+#[derive(Debug)]
+pub enum GetSourceHashResult {
+    Hit { hash: Hash },
+    Modified,
+    Miss,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -209,22 +217,34 @@ mod tests {
     use std::path;
 
     #[tokio::test]
-    pub async fn when_hash_doesnt_exist_then_try_get_source_hash_should_return_none() {
+    pub async fn when_hash_doesnt_exist_then_try_get_source_hash_should_return_miss() {
         let db = Db::open_in_memory().await.unwrap();
         let path = path::absolute("/test_path").unwrap();
         let result = db.try_get_source_hash(&path, 10, 20, 30).await.unwrap();
-        assert!(result.is_none());
+        assert_matches!(result, GetSourceHashResult::Miss);
     }
 
     #[tokio::test]
-    pub async fn when_hash_exists_then_try_get_source_hash_should_return_some() {
+    pub async fn when_hash_exists_then_try_get_source_hash_should_return_hit() {
         let db = Db::open_in_memory().await.unwrap();
         let path = path::absolute("/test_path").unwrap();
         db.set_source_hash(&path, 10, 20, 30, Hash::default())
             .await
             .unwrap();
         let result = db.try_get_source_hash(&path, 10, 20, 30).await.unwrap();
-        assert_matches!(result, Some(hash) if hash == Hash::default());
+        assert_matches!(result, GetSourceHashResult::Hit { hash } if hash == Hash::default());
+    }
+
+    #[tokio::test]
+    pub async fn when_hash_exists_but_for_wrong_data_then_try_get_source_hash_should_return_modified()
+     {
+        let db = Db::open_in_memory().await.unwrap();
+        let path = path::absolute("/test_path").unwrap();
+        db.set_source_hash(&path, 10, 20, 30, Hash::default())
+            .await
+            .unwrap();
+        let result = db.try_get_source_hash(&path, 11, 22, 33).await.unwrap();
+        assert_matches!(result, GetSourceHashResult::Modified);
     }
 
     #[tokio::test]
@@ -236,7 +256,7 @@ mod tests {
             .unwrap();
         db.remove_source_hash(&path).await.unwrap();
         let result = db.try_get_source_hash(&path, 10, 20, 30).await.unwrap();
-        assert_matches!(result, None);
+        assert_matches!(result, GetSourceHashResult::Miss);
     }
 
     #[tokio::test]

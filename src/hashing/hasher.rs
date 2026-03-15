@@ -38,11 +38,7 @@ impl Hasher {
             let take_exclusive_lock = self.take_exclusive_lock;
             let file_path = file_path.as_ref().to_owned();
             move || -> Result<Hash, HashingError> {
-                let _span = tracing::trace_span!(
-                    "Hashing file",
-                    file = file_path.to_string_lossy().to_string()
-                )
-                .entered();
+                let _span = tracing::trace_span!("Hashing file").entered();
                 let file = {
                     if take_exclusive_lock {
                         Self::open_file_exclusively(file_path)?
