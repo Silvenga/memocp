@@ -1,5 +1,5 @@
-use crate::cloning::Copier;
 use crate::config::Config;
+use crate::copying::Copier;
 use crate::db::Db;
 use crate::hashing::Hasher;
 use crate::processor::Processor;
@@ -42,7 +42,7 @@ impl Runner {
             .with_take_exclusive_lock(self.config.exclusive_lock)
             .with_read_chunk_size(self.config.hashing_read_chunk_size.as_u64());
 
-        let copier = if self.config.load
+        let copier = if !self.config.load
             && let Some(destination_path) = &self.config.destination_path
         {
             let templater = Templater::new(&source_path, destination_path);
@@ -51,6 +51,7 @@ impl Runner {
                 .with_override_existing(self.config.override_existing);
             Some(copier)
         } else {
+            tracing::info!("Load enabled, scanning source directory without copying.");
             None
         };
 

@@ -1,4 +1,4 @@
-use crate::cloning::FileCopyResult;
+use crate::copying::FileCopyResult;
 use crate::processor::{FileCacheResult, FileResult};
 use std::sync::atomic::{AtomicU64, Ordering};
 

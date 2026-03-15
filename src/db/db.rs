@@ -123,6 +123,7 @@ impl Db {
         .await?
     }
 
+    #[allow(dead_code)]
     pub async fn get_seen(&self, hash: Hash) -> anyhow::Result<Option<SeenRecord>> {
         task::spawn_blocking({
             let db = self.db.clone();
@@ -150,14 +151,14 @@ impl Db {
         .await?
     }
 
-    pub async fn set_seen(&self, record: SeenRecord) -> anyhow::Result<()> {
+    pub async fn set_seen(&self, file_hash: Hash, record: SeenRecord) -> anyhow::Result<()> {
         task::spawn_blocking({
             let db = self.db.clone();
             move || -> anyhow::Result<()> {
                 let write_txn = db.begin_write()?;
                 {
                     let mut table = write_txn.open_table(SEEN_TABLE)?;
-                    table.insert(record.file_hash, &record)?;
+                    table.insert(file_hash, &record)?;
                 }
                 write_txn.commit()?;
                 Ok(())
@@ -166,6 +167,7 @@ impl Db {
         .await?
     }
 
+    #[allow(dead_code)]
     pub async fn remove_seen(&self, hash: Hash) -> anyhow::Result<()> {
         task::spawn_blocking({
             let db = self.db.clone();
@@ -272,15 +274,11 @@ mod tests {
         let db = Db::open_in_memory().await.unwrap();
         let hash = Hash::default();
         let record = SeenRecord {
-            source_path: "foo".to_string(),
-            destination_path: "bar".to_string(),
-            file_size_bytes: 123,
-            file_modified_time: 456,
-            file_created_time: 789,
-            file_hash: hash,
             copied_time: 101112,
         };
-        db.set_seen(record.clone()).await.unwrap();
+        db.set_seen(Hash::empty_hash(), record.clone())
+            .await
+            .unwrap();
         let result = db.get_seen(hash).await.unwrap();
         assert_eq!(result, Some(record));
     }
@@ -290,15 +288,9 @@ mod tests {
         let db = Db::open_in_memory().await.unwrap();
         let hash = Hash::default();
         let record = SeenRecord {
-            source_path: "foo".to_string(),
-            destination_path: "bar".to_string(),
-            file_size_bytes: 123,
-            file_modified_time: 456,
-            file_created_time: 789,
-            file_hash: hash,
             copied_time: 101112,
         };
-        db.set_seen(record).await.unwrap();
+        db.set_seen(Hash::empty_hash(), record).await.unwrap();
         let result = db.exists_seen(hash).await.unwrap();
         assert!(result);
     }
@@ -308,15 +300,9 @@ mod tests {
         let db = Db::open_in_memory().await.unwrap();
         let hash = Hash::default();
         let record = SeenRecord {
-            source_path: "foo".to_string(),
-            destination_path: "bar".to_string(),
-            file_size_bytes: 123,
-            file_modified_time: 456,
-            file_created_time: 789,
-            file_hash: hash,
             copied_time: 101112,
         };
-        db.set_seen(record).await.unwrap();
+        db.set_seen(Hash::empty_hash(), record).await.unwrap();
         db.remove_seen(hash).await.unwrap();
         let result = db.get_seen(hash).await.unwrap();
         assert!(result.is_none());

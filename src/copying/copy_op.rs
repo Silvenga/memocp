@@ -26,6 +26,10 @@ impl CopyOp {
             move || {
                 let _span = tracing::trace_span!("Copying file").entered();
 
+                if !override_existing && fs::exists(&destination)? {
+                    return Err(anyhow!("Destination file already exists."));
+                }
+
                 let Some(parent) = destination.parent() else {
                     return Err(anyhow!(
                         "Destination path has no parent directory, cannot create temporary file."
@@ -36,6 +40,9 @@ impl CopyOp {
 
                 match op {
                     CopyOp::HardLink => {
+                        if override_existing && fs::exists(&destination)? {
+                            fs::remove_file(&destination)?;
+                        }
                         fs::hard_link(&source, &destination)?;
                     }
                     CopyOp::Reflink | CopyOp::Copy => {

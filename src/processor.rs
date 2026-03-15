@@ -1,4 +1,4 @@
-use crate::cloning::{Copier, FileCopyResult};
+use crate::copying::{Copier, FileCopyResult};
 use crate::db::{Db, GetSourceHashResult};
 use crate::hashing::{Hash, Hasher};
 use crate::models::FileMetadata;

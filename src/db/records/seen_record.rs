@@ -1,16 +1,9 @@
-use crate::hashing::Hash;
 use borsh::{BorshDeserialize, BorshSerialize};
 use redb::{TypeName, Value};
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SeenRecord {
-    pub source_path: String,
-    pub destination_path: String,
-    pub file_size_bytes: u64,
-    pub file_modified_time: u64,
-    pub file_created_time: u64,
-    pub file_hash: Hash,
-    pub copied_time: u64,
+    pub copied_time: u128,
 }
 
 impl Value for SeenRecord {
@@ -47,12 +40,6 @@ mod tests {
     #[test]
     fn round_trip() {
         let record = SeenRecord {
-            source_path: "foo".to_string(),
-            destination_path: "bar".to_string(),
-            file_size_bytes: 123,
-            file_modified_time: 456,
-            file_created_time: 789,
-            file_hash: Hash::default(),
             copied_time: 101112,
         };
         let serialized = SeenRecord::as_bytes(&record);

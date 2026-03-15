@@ -1,10 +1,11 @@
-use crate::cloning::CopyOp;
-use crate::db::Db;
+use crate::copying::CopyOp;
+use crate::db::{Db, SeenRecord};
 use crate::models::FileMetadata;
 use crate::templating::Templater;
+use bytesize::ByteSize;
 use humantime::format_duration;
 use std::path::Path;
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 pub struct Copier {
     db: Db,
@@ -46,7 +47,7 @@ impl Copier {
             return Ok(FileCopyResult::Skipped);
         }
 
-        let destination = self.templater.render_destination(&file, &metadata)?;
+        let destination = self.templater.render_destination(&file, metadata)?;
 
         tracing::debug!("Copying to {:?}.", destination);
 
@@ -56,7 +57,20 @@ impl Copier {
             .execute(&file, &destination, self.override_existing)
             .await?;
 
-        tracing::debug!("Copied after {}.", format_duration(copy_start.elapsed()));
+        self.db
+            .set_seen(
+                metadata.file_hash,
+                SeenRecord {
+                    copied_time: get_current_time(),
+                },
+            )
+            .await?;
+
+        tracing::info!(
+            "Copied {} after {}.",
+            ByteSize::b(metadata.file_size_bytes),
+            format_duration(copy_start.elapsed())
+        );
 
         Ok(FileCopyResult::Copied)
     }
@@ -65,4 +79,12 @@ impl Copier {
 pub enum FileCopyResult {
     Skipped,
     Copied,
+}
+
+fn get_current_time() -> u128 {
+    let start = SystemTime::now();
+    let since_the_epoch = start
+        .duration_since(UNIX_EPOCH)
+        .expect("time should be after UNIX EPOCH");
+    since_the_epoch.as_millis()
 }

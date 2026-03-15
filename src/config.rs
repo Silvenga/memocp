@@ -1,4 +1,4 @@
-use crate::cloning::CopyOp;
+use crate::copying::CopyOp;
 use bytesize::ByteSize;
 use clap::Parser;
 use std::{env, thread};
