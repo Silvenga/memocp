@@ -2,6 +2,7 @@ use crate::copying::{Copier, FileCopyResult};
 use crate::db::{Db, GetSourceHashResult};
 use crate::hashing::{Hash, Hasher};
 use crate::models::FileMetadata;
+use crate::progress::{ProcessorProgress, ProcessorStage};
 use humantime::format_duration;
 use std::path::Path;
 use std::time::{Instant, UNIX_EPOCH};
@@ -22,10 +23,15 @@ impl Processor {
         }
     }
 
-    pub async fn process(&self, file: impl AsRef<Path>) -> anyhow::Result<FileResult> {
-        let (metadata, cache_result) = self.get_file_metadata(&file).await?;
+    pub async fn process(
+        &self,
+        file: impl AsRef<Path>,
+        progress: &ProcessorProgress,
+    ) -> anyhow::Result<FileResult> {
+        let (metadata, cache_result) = self.get_file_metadata(&file, progress).await?;
 
         let copy_result = if let Some(copier) = &self.copier {
+            progress.set_stage(ProcessorStage::Copying);
             copier.try_copy(&file, &metadata).await?
         } else {
             FileCopyResult::Skipped
@@ -41,6 +47,7 @@ impl Processor {
     async fn get_file_metadata(
         &self,
         file: impl AsRef<Path>,
+        progress: &ProcessorProgress,
     ) -> anyhow::Result<(FileMetadata, FileCacheResult)> {
         let metadata = fs::metadata(&file).await?;
 
@@ -56,6 +63,7 @@ impl Processor {
                 file_size_bytes,
                 file_modified_time,
                 file_created_time,
+                progress,
             )
             .await?;
 
@@ -75,6 +83,7 @@ impl Processor {
         file_size_bytes: u64,
         file_modified_time: u128,
         file_created_time: u128,
+        progress: &ProcessorProgress,
     ) -> anyhow::Result<(Hash, FileCacheResult)> {
         let cache_result = self
             .db
@@ -94,6 +103,8 @@ impl Processor {
                 } else {
                     tracing::debug!("File not seen before, calculating hash.");
                 }
+
+                progress.set_stage(ProcessorStage::Hashing);
 
                 let hashing_start = Instant::now();
 

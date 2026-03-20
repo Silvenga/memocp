@@ -17,6 +17,7 @@ mod runner;
 mod scanner;
 mod stats;
 mod templating;
+mod progress;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

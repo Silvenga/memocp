@@ -3,6 +3,7 @@ use crate::copying::Copier;
 use crate::db::Db;
 use crate::hashing::Hasher;
 use crate::processor::Processor;
+use crate::progress::ProcessorProgress;
 use crate::scanner::Scanner;
 use crate::stats::Stats;
 use crate::templating::Templater;
@@ -18,7 +19,7 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::Instrument;
 
-const MAX_SCANNING_QUEUE_SIZE: usize = 100_000;
+const MAX_SCANNING_QUEUE_SIZE: usize = 10_000;
 
 pub struct Runner {
     config: Config,
@@ -71,12 +72,9 @@ impl Runner {
                 move |file| {
                     let processor = processor.clone();
                     let stats = stats.clone();
-                    let span = tracing::info_span!(
-                        "Processing file",
-                        file = file.to_string_lossy().to_string()
-                    );
+                    let (progress, span) = ProcessorProgress::new(&file);
                     async move {
-                        match processor.process(&file).await {
+                        match processor.process(&file, &progress).await {
                             Ok(result) => {
                                 stats.process(&result);
                             }

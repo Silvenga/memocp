@@ -1,7 +1,9 @@
+use crate::progress::ScannerProgress;
 use ignore::WalkBuilder;
 use ignore::overrides::OverrideBuilder;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::error::TrySendError;
 use tokio::task;
 
 pub struct Scanner {
@@ -56,16 +58,39 @@ impl Scanner {
 
         task::spawn_blocking({
             move || {
-                let _span = tracing::info_span!("Scanning source paths").entered();
+                let (progress, span) = ScannerProgress::new();
+                let _ = span.enter();
 
                 let mut total = 0u64;
                 for result in walker {
                     match result {
                         Ok(entry) => {
-                            if let Some(file_type) = entry.file_type()
-                                && file_type.is_file()
-                                && tx.blocking_send(entry.into_path()).is_err()
-                            {
+                            let mut channel_closed = false;
+
+                            if let Some(file_type) = entry.file_type() {
+                                if file_type.is_file() {
+                                    progress.inc_files();
+                                    match tx.try_send(entry.into_path()) {
+                                        Ok(_) => {
+                                            // No blocking.
+                                        }
+                                        Err(TrySendError::Full(returned_path)) => {
+                                            progress.set_blocked(true);
+                                            if tx.blocking_send(returned_path).is_err() {
+                                                channel_closed = true;
+                                            }
+                                            progress.set_blocked(false);
+                                        }
+                                        Err(TrySendError::Closed(_)) => {
+                                            channel_closed = true;
+                                        }
+                                    }
+                                } else if file_type.is_dir() {
+                                    progress.inc_directories();
+                                }
+                            }
+
+                            if channel_closed {
                                 break;
                             }
                             total += 1;
