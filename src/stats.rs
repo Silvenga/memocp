@@ -1,5 +1,5 @@
 use crate::copying::FileCopyResult;
-use crate::processor::{FileCacheResult, FileResult};
+use crate::worker::{FileCacheResult, FileResult};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(Default)]

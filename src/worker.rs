@@ -8,13 +8,13 @@ use std::path::Path;
 use std::time::{Instant, UNIX_EPOCH};
 use tokio::fs;
 
-pub struct Processor {
+pub struct Worker {
     db: Db,
     hasher: Hasher,
     copier: Option<Copier>,
 }
 
-impl Processor {
+impl Worker {
     pub fn new(db: &Db, hasher: Hasher, copier: Option<Copier>) -> Self {
         Self {
             db: db.clone(),

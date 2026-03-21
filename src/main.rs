@@ -7,17 +7,17 @@ use tracing_indicatif::IndicatifLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-mod copying;
 mod config;
+mod copying;
 mod db;
 mod hashing;
 mod models;
-mod processor;
+mod progress;
 mod runner;
 mod scanner;
 mod stats;
 mod templating;
-mod progress;
+mod worker;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

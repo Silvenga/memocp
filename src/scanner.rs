@@ -1,6 +1,7 @@
 use crate::progress::ScannerProgress;
 use ignore::WalkBuilder;
 use ignore::overrides::OverrideBuilder;
+use num_format::{Locale, ToFormattedString};
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::TrySendError;
@@ -61,7 +62,8 @@ impl Scanner {
                 let (progress, span) = ScannerProgress::new();
                 let _ = span.enter();
 
-                let mut total = 0u64;
+                let mut files = 0u64;
+                let mut directories = 0u64;
                 for result in walker {
                     match result {
                         Ok(entry) => {
@@ -70,6 +72,7 @@ impl Scanner {
                             if let Some(file_type) = entry.file_type() {
                                 if file_type.is_file() {
                                     progress.inc_files();
+                                    files += 1;
                                     match tx.try_send(entry.into_path()) {
                                         Ok(_) => {
                                             // No blocking.
@@ -86,6 +89,7 @@ impl Scanner {
                                         }
                                     }
                                 } else if file_type.is_dir() {
+                                    directories += 1;
                                     progress.inc_directories();
                                 }
                             }
@@ -93,7 +97,6 @@ impl Scanner {
                             if channel_closed {
                                 break;
                             }
-                            total += 1;
                         }
                         Err(error) => {
                             tracing::warn!("Encountered non-fatal error while scanning: {error}.");
@@ -101,7 +104,11 @@ impl Scanner {
                     }
                 }
 
-                tracing::info!("Source scanning complete, discovered {total} files.");
+                tracing::info!(
+                    "Source scanning complete, discovered {} directories and {} files.",
+                    directories.to_formatted_string(&Locale::en),
+                    files.to_formatted_string(&Locale::en),
+                );
             }
         })
         .await?;

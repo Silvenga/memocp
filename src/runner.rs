@@ -2,11 +2,11 @@ use crate::config::Config;
 use crate::copying::Copier;
 use crate::db::Db;
 use crate::hashing::Hasher;
-use crate::processor::Processor;
 use crate::progress::ProcessorProgress;
 use crate::scanner::Scanner;
 use crate::stats::Stats;
 use crate::templating::Templater;
+use crate::worker::Worker;
 use bytesize::ByteSize;
 use futures::StreamExt;
 use humantime::format_duration;
@@ -19,8 +19,6 @@ use tokio::io;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::Instrument;
-
-const MAX_SCANNING_QUEUE_SIZE: usize = 10_000;
 
 pub struct Runner {
     config: Config,
@@ -57,13 +55,13 @@ impl Runner {
             None
         };
 
-        let processor = Processor::new(&self.db, hasher, copier);
+        let processor = Worker::new(&self.db, hasher, copier);
 
         let stats = Arc::from(Stats::default());
 
         let start_time = Instant::now();
 
-        let (tx, rx) = mpsc::channel::<PathBuf>(MAX_SCANNING_QUEUE_SIZE);
+        let (tx, rx) = mpsc::channel::<PathBuf>(self.config.queue_depth);
         let scanner_task = scanner.scan(tx);
 
         let processing_tasks =

@@ -14,6 +14,10 @@ pub struct Config {
     #[arg(index = 2, required_unless_present_any = ["load"])]
     pub destination_path: Option<String>,
 
+    /// Scan the source directory/file to populate the database of "seen" file hashes without copying files.
+    #[arg(long)]
+    pub load: bool,
+
     /// The glob pattern to use for filtering files. Ignored if the source path is a file.
     /// Globs are matched case-insensitively.
     #[arg(long)]
@@ -23,15 +27,15 @@ pub struct Config {
     #[arg(short, long, default_value_t = default_state_file())]
     pub state_file: String,
 
-    /// Enable verbose logging.
-    #[arg(short, long, default_value_t = false)]
-    pub verbose: bool,
-
     /// The maximum number of threads to use for hashing and copying.
     /// An additional thread will always be used for scanning.
     /// Defaults to `8` or the number of CPU cores, whichever is smaller.
     #[arg(long, default_value_t = default_concurrency())]
     pub concurrency: usize,
+
+    /// The maximum size of the discovery queue before the scanner will pause.
+    #[arg(long, default_value_t = 100_000)]
+    pub queue_depth: usize,
 
     /// Take an exclusive lock on files during hashing.
     /// You likely only want to use this under Windows, where file locking is more reliable.
@@ -43,10 +47,6 @@ pub struct Config {
     #[arg(long, default_value = "4 MiB")]
     pub hashing_read_chunk_size: ByteSize,
 
-    /// Ignore hidden files.
-    #[arg(long)]
-    pub ignore_hidden: bool,
-
     /// Override existing files at the destination.
     #[arg(long = "override")]
     pub override_existing: bool,
@@ -55,9 +55,13 @@ pub struct Config {
     #[arg(long = "mode", value_enum, default_value_t = CopyOp::Reflink, ignore_case = true)]
     pub copy_mode: CopyOp,
 
-    /// Scan the source directory/file to populate the database of "seen" file hashes without copying files.
+    /// Ignore hidden files.
     #[arg(long)]
-    pub load: bool,
+    pub ignore_hidden: bool,
+
+    /// Enable verbose logging.
+    #[arg(short, long, default_value_t = false)]
+    pub verbose: bool,
 }
 
 fn default_concurrency() -> usize {
