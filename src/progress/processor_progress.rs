@@ -30,7 +30,7 @@ impl ProcessorProgress {
             }
         });
 
-        let span = tracing::info_span!("Processing file");
+        let span = tracing::info_span!("");
         span.pb_set_style(&style);
         span.pb_set_message(&format!("{}", file.as_ref().display()));
 

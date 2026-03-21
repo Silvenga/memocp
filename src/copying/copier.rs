@@ -67,7 +67,8 @@ impl Copier {
             .await?;
 
         tracing::info!(
-            "Copied {} after {}.",
+            "Copied {} ({}) after {}.",
+            file.as_ref().display(),
             ByteSize::b(metadata.file_size_bytes),
             format_duration(copy_start.elapsed())
         );

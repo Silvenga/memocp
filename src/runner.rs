@@ -55,7 +55,7 @@ impl Runner {
             None
         };
 
-        let processor = Worker::new(&self.db, hasher, copier);
+        let worker = Worker::new(&self.db, hasher, copier);
 
         let stats = Arc::from(Stats::default());
 
@@ -66,14 +66,14 @@ impl Runner {
 
         let processing_tasks =
             ReceiverStream::new(rx).for_each_concurrent(self.config.concurrency, {
-                let processor = Arc::from(processor);
+                let worker = Arc::from(worker);
                 let stats = stats.clone();
                 move |file| {
-                    let processor = processor.clone();
+                    let worker = worker.clone();
                     let stats = stats.clone();
                     let (progress, span) = ProcessorProgress::new(&file);
                     async move {
-                        match processor.process(&file, &progress).await {
+                        match worker.process(&file, &progress).await {
                             Ok(result) => {
                                 stats.process(&result);
                             }

@@ -43,8 +43,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with(
             tracing_subscriber::fmt::layer()
                 .with_writer(indicatif_layer.get_stderr_writer())
-                .with_target(false)
-                .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NONE),
+                .with_target(false),
         )
         .with(indicatif_layer)
         .init();
