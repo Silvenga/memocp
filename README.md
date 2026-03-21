@@ -114,3 +114,4 @@ The destination path can contain the following variables:
 - Directory symlinks are followed, file symlinks are not copied (the symlinked file is copied).
 - Hidden files are considered by default.
 - Actually tries to handle paths that have invalid UTF-8 characters. That was a pain to code.
+- Source files are cached by (creation time, modified time, file size).

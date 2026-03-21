@@ -27,7 +27,7 @@ pub struct Config {
     #[arg(short, long, default_value_t = default_state_file())]
     pub state_file: String,
 
-    /// The maximum number of threads to use for hashing and copying.
+    /// The maximum number of threads to use for file operations.
     /// An additional thread will always be used for scanning.
     /// Defaults to `8` or the number of CPU cores, whichever is smaller.
     #[arg(long, default_value_t = default_concurrency())]
