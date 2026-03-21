@@ -6,15 +6,15 @@ use std::{env, thread};
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct Config {
-    /// The source directory/file to copy from.
+    /// The source directory to copy from.
     #[arg(index = 1)]
     pub source_path: String,
 
-    /// The destination/file directory to copy to. If the directory does not exist, it will be created.
+    /// The destination directory to copy to. If the directory does not exist, it will be created.
     #[arg(index = 2, required_unless_present_any = ["load"])]
     pub destination_path: Option<String>,
 
-    /// Scan the source directory/file to populate the database of "seen" file hashes without copying files.
+    /// Scan the source directory to populate the database of "seen" file hashes without copying files.
     #[arg(long)]
     pub load: bool,
 

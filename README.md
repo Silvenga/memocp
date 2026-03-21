@@ -64,12 +64,12 @@ By default, the database will be stored in `./memocp.db`.
 Usage: memocp [OPTIONS] <SOURCE_PATH> [DESTINATION_PATH]
 
 Arguments:
-  <SOURCE_PATH>       The source directory/file to copy from
-  [DESTINATION_PATH]  The destination/file directory to copy to. If the directory does not exist, it will be created
+  <SOURCE_PATH>       The source directory to copy from
+  [DESTINATION_PATH]  The destination directory to copy to. If the directory does not exist, it will be created
 
 Options:
       --load
-          Scan the source directory/file to populate the database of "seen" file hashes without copying files
+          Scan the source directory to populate the database of "seen" file hashes without copying files
       --glob <GLOB>
           The glob pattern to use for filtering files. Ignored if the source path is a file. Globs are matched case-insensitively
   -s, --state-file <STATE_FILE>
