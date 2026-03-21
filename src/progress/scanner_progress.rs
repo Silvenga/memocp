@@ -80,7 +80,7 @@ impl Shared {
 
     pub fn get_blocked(&self) -> &'static str {
         match self.is_blocked.load(Ordering::Relaxed) {
-            true => " (Waiting)",
+            true => " (Paused)",
             false => "",
         }
     }

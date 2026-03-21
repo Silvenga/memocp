@@ -10,6 +10,7 @@ use crate::templating::Templater;
 use bytesize::ByteSize;
 use futures::StreamExt;
 use humantime::format_duration;
+use num_format::{Locale, ToFormattedString};
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -97,7 +98,7 @@ impl Runner {
             let stats = stats.get_stats();
             tracing::info!(
                 "Processed {} files ({}) in {}.",
-                stats.total_files,
+                stats.total_files.to_formatted_string(&Locale::en),
                 ByteSize::b(stats.total_bytes),
                 format_duration(start_time.elapsed())
             );
@@ -105,16 +106,28 @@ impl Runner {
                 "Hashing: {} ({}) new, {} ({}) modified, {} ({}) unchanged.",
                 stats.cache_stats.new_files,
                 ByteSize::b(stats.cache_stats.new_bytes),
-                stats.cache_stats.modified_files,
+                stats
+                    .cache_stats
+                    .modified_files
+                    .to_formatted_string(&Locale::en),
                 ByteSize::b(stats.cache_stats.modified_bytes),
-                stats.cache_stats.unchanged_files,
+                stats
+                    .cache_stats
+                    .unchanged_files
+                    .to_formatted_string(&Locale::en),
                 ByteSize::b(stats.cache_stats.unchanged_bytes),
             );
             tracing::info!(
                 "Copying: {} ({}) copied, {} ({}) skipped.",
-                stats.copy_stats.copied_files,
+                stats
+                    .copy_stats
+                    .copied_files
+                    .to_formatted_string(&Locale::en),
                 ByteSize::b(stats.copy_stats.copied_bytes),
-                stats.copy_stats.skipped_files,
+                stats
+                    .copy_stats
+                    .skipped_files
+                    .to_formatted_string(&Locale::en),
                 ByteSize::b(stats.copy_stats.skipped_bytes),
             );
         }

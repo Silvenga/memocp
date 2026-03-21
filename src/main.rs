@@ -40,7 +40,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     tracing_subscriber::registry()
         .with(log_level)
-        .with(tracing_subscriber::fmt::layer().with_writer(indicatif_layer.get_stderr_writer()))
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_writer(indicatif_layer.get_stderr_writer())
+                .with_target(false)
+                .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NONE),
+        )
         .with(indicatif_layer)
         .init();
 
