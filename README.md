@@ -39,6 +39,10 @@ Once a file is copied, it is remembered in the database - a **memo**rized-**c**o
   naming-conflicts (while maintaining the original file name and folder prefix).
 * **Globbing:** Copy only files matching a glob pattern.
 
+## Demo
+
+![demo](./docs/demo.webp)
+
 ## Example
 
 ```bash
