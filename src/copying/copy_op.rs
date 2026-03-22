@@ -1,3 +1,4 @@
+use crate::copying::temp_file_guard::TempFileGuard;
 use anyhow::anyhow;
 use clap::ValueEnum;
 use std::fs;
@@ -52,28 +53,21 @@ impl CopyOp {
 
                         let temp_file_name = format!(".memocp_tmp_{}", Uuid::new_v4().simple());
                         let temp_path = parent.join(temp_file_name);
+                        let mut guard = TempFileGuard::new(temp_path.clone());
 
-                        let result = match op {
+                        match op {
                             CopyOp::Reflink => {
                                 reflink_copy::reflink_or_copy(&source, &temp_path)?;
-                                Ok(())
                             }
                             CopyOp::Copy => {
                                 fs::copy(&source, &temp_path)?;
-                                Ok(())
                             }
                             _ => unreachable!(),
                         };
 
-                        if let Err(e) = result {
-                            let _ = fs::remove_file(&temp_path);
-                            return Err(e);
-                        }
+                        fs::rename(&temp_path, &destination)?;
 
-                        if let Err(e) = fs::rename(&temp_path, &destination) {
-                            let _ = fs::remove_file(&temp_path);
-                            return Err(e.into());
-                        }
+                        guard.disarm();
                     }
                 }
 
