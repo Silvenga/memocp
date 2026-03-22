@@ -52,7 +52,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     log_panics::init();
 
     let runner = Runner::new(config).await?;
-    runner.run().await?;
+
+    tokio::select! {
+        result = runner.run() => {
+            result?;
+        }
+        _ = tokio::signal::ctrl_c() => {
+            eprintln!("Ctrl+C received, finishing outstanding tasks...");
+        }
+    }
 
     Ok(())
 }
