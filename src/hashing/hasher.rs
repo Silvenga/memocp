@@ -1,11 +1,12 @@
 use super::{Hash, HashingError};
+use crate::task::spawn_blocking_with_cancellation;
 use blake3::Hasher as Blake3Hasher;
 use fs4::fs_std::FileExt;
 use std::fs::File;
 use std::io;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use tokio::task;
+use tokio_util::sync::CancellationToken;
 
 pub struct Hasher {
     read_chunk_size: u64,
@@ -33,11 +34,11 @@ impl Hasher {
     }
 
     pub async fn hash_file(&self, file_path: impl AsRef<Path>) -> Result<Hash, HashingError> {
-        task::spawn_blocking({
+        spawn_blocking_with_cancellation({
             let read_chunk_size = self.read_chunk_size;
             let take_exclusive_lock = self.take_exclusive_lock;
             let file_path = file_path.as_ref().to_owned();
-            move || -> Result<Hash, HashingError> {
+            move |cancellation_token| -> Result<Hash, HashingError> {
                 let _span = tracing::trace_span!("Hashing file").entered();
                 let file = {
                     if take_exclusive_lock {
@@ -46,7 +47,7 @@ impl Hasher {
                         File::open(file_path)?
                     }
                 };
-                let hash = Self::hash_file_stream(file, read_chunk_size)?;
+                let hash = Self::hash_file_stream(file, read_chunk_size, cancellation_token)?;
                 Ok(hash)
             }
         })
@@ -64,7 +65,11 @@ impl Hasher {
         Ok(file)
     }
 
-    fn hash_file_stream(mut file: File, read_chunk_size: u64) -> io::Result<Hash> {
+    fn hash_file_stream(
+        mut file: File,
+        read_chunk_size: u64,
+        cancellation_token: CancellationToken,
+    ) -> io::Result<Hash> {
         let mut hasher = Blake3Hasher::new();
         let mut buffer = vec![0; read_chunk_size.try_into().unwrap_or(usize::MAX)];
 
@@ -76,6 +81,13 @@ impl Hasher {
                 }
                 Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
                 Err(e) => return Err(e),
+            }
+            if cancellation_token.is_cancelled() {
+                tracing::trace!("Hashing was cancelled.");
+                return Err(io::Error::new(
+                    io::ErrorKind::Interrupted,
+                    "Operation cancelled",
+                ));
             }
         }
 

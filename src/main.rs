@@ -17,6 +17,7 @@ mod progress;
 mod runner;
 mod scanner;
 mod stats;
+mod task;
 mod templating;
 mod worker;
 
@@ -58,7 +59,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             result?;
         }
         _ = tokio::signal::ctrl_c() => {
-            eprintln!("Ctrl+C received, finishing outstanding tasks...");
+            eprintln!("Ctrl+C received, finishing outstanding copies...");
         }
     }
 

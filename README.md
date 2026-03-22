@@ -143,3 +143,6 @@ The destination path can contain the following variables:
 - Hidden files are considered by default.
 - Actually tries to handle paths that have invalid UTF-8 characters. That was a pain to code.
 - Source files are cached by (creation time, modified time, file size).
+- Canceling the process with `CTRL+C` will trigger a graceful shutdown, outstanding database and copy operations will be
+  completed. Hashing will be canceled. Forcefully killing the process will leave the temporary files in place, database
+  operations will be rolled back on the next run.
