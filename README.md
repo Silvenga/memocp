@@ -43,6 +43,30 @@ Once a file is copied, it is remembered in the database - a **memo**rized-**c**o
 
 ![demo](./docs/demo.webp)
 
+## Installation
+
+User x64 Linux and Windows binaries are available on
+the [releases page](https://github.com/Silvenga/memocp/releases/latest) (request macOS or others).
+
+```bash
+curl -L https://github.com/Silvenga/memocp/releases/latest/download/memocp -o memocp
+sudo install memocp /usr/local/bin/memocp
+rm memocp
+```
+
+```pwsh
+Invoke-WebRequest `
+    -Uri https://github.com/Silvenga/memocp/releases/latest/download/memocp.exe `
+    -UseBasicParsing `
+    -OutFile memocp.exe
+```
+
+Linux container images are also available:
+
+```bash
+docker run -it --rm  ghcr.io/silvenga/memocp:latest --help
+```
+
 ## Example
 
 ```bash
