@@ -12,6 +12,7 @@ pub struct Worker {
     db: Db,
     hasher: Hasher,
     copier: Option<Copier>,
+    no_cache: bool,
 }
 
 impl Worker {
@@ -20,7 +21,13 @@ impl Worker {
             db: db.clone(),
             hasher,
             copier,
+            no_cache: false,
         }
+    }
+
+    pub fn with_no_cache(mut self, no_cache: bool) -> Self {
+        self.no_cache = no_cache;
+        self
     }
 
     pub async fn process(
@@ -85,20 +92,25 @@ impl Worker {
         file_created_time: u128,
         progress: &WorkerProgress,
     ) -> anyhow::Result<(Hash, FileCacheResult)> {
-        let cache_result = self
-            .db
-            .try_get_source_hash(
-                &file,
-                file_size_bytes,
-                file_modified_time,
-                file_created_time,
-            )
-            .await?;
+        let cache_result = if self.no_cache {
+            GetSourceHashResult::Miss
+        } else {
+            self.db
+                .try_get_source_hash(
+                    &file,
+                    file_size_bytes,
+                    file_modified_time,
+                    file_created_time,
+                )
+                .await?
+        };
 
         match cache_result {
             GetSourceHashResult::Hit { hash } => Ok((hash, FileCacheResult::Unchanged)),
             GetSourceHashResult::Modified | GetSourceHashResult::Miss => {
-                if matches!(cache_result, GetSourceHashResult::Modified) {
+                if self.no_cache {
+                    tracing::debug!("Cache disabled, recalculating hash.");
+                } else if matches!(cache_result, GetSourceHashResult::Modified) {
                     tracing::debug!("File was modified since last seen, recalculating hash.");
                 } else {
                     tracing::debug!("File not seen before, calculating hash.");
@@ -116,15 +128,17 @@ impl Worker {
                     format_duration(hashing_start.elapsed())
                 );
 
-                self.db
-                    .set_source_hash(
-                        &file,
-                        file_size_bytes,
-                        file_modified_time,
-                        file_created_time,
-                        file_hash,
-                    )
-                    .await?;
+                if !self.no_cache {
+                    self.db
+                        .set_source_hash(
+                            &file,
+                            file_size_bytes,
+                            file_modified_time,
+                            file_created_time,
+                            file_hash,
+                        )
+                        .await?;
+                }
 
                 if matches!(cache_result, GetSourceHashResult::Modified) {
                     Ok((file_hash, FileCacheResult::Modified))

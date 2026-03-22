@@ -22,6 +22,10 @@ pub struct Config {
     #[arg(long)]
     pub no_cleanup: bool,
 
+    /// Disables reading or writing to the cache.
+    #[arg(long)]
+    pub no_cache: bool,
+
     /// The glob pattern to use for filtering files. Ignored if the source path is a file.
     /// Globs are matched case-insensitively.
     #[arg(long)]

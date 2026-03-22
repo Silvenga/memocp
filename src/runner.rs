@@ -56,7 +56,7 @@ impl Runner {
             None
         };
 
-        let worker = Worker::new(&self.db, hasher, copier);
+        let worker = Worker::new(&self.db, hasher, copier).with_no_cache(self.config.no_cache);
 
         let cleanup = Cleanup::new(&self.db)
             .with_concurrency(self.config.concurrency)

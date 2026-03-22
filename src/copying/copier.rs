@@ -116,7 +116,10 @@ mod tests {
             file_size_bytes: 11,
             file_modified_time: 0,
             file_created_time: 0,
-            file_hash: Hash::from_str("d74981efa70a0c880b8d8c1985d075dbcbf679b99a5f9914e5aaf96b831a9e24").unwrap(),
+            file_hash: Hash::from_str(
+                "d74981efa70a0c880b8d8c1985d075dbcbf679b99a5f9914e5aaf96b831a9e24",
+            )
+            .unwrap(),
         };
 
         let result = copier.try_copy(file.path(), &metadata).await.unwrap();
@@ -136,8 +139,12 @@ mod tests {
         let file = source_dir.child("foo.txt");
         file.write_str("hello world").unwrap();
         let db = Db::open_in_memory().await.unwrap();
-        let hash = Hash::from_str("d74981efa70a0c880b8d8c1985d075dbcbf679b99a5f9914e5aaf96b831a9e24").unwrap();
-        db.set_seen(hash, SeenRecord { copied_time: 0 }).await.unwrap();
+        let hash =
+            Hash::from_str("d74981efa70a0c880b8d8c1985d075dbcbf679b99a5f9914e5aaf96b831a9e24")
+                .unwrap();
+        db.set_seen(hash, SeenRecord { copied_time: 0 })
+            .await
+            .unwrap();
         let templater = Templater::new(source_dir.path(), dest_dir.path().to_string_lossy());
         let copier = Copier::new(&db, templater).with_copy_op(CopyOp::Copy);
         let metadata = FileMetadata {
@@ -173,7 +180,10 @@ mod tests {
             file_size_bytes: 11,
             file_modified_time: 0,
             file_created_time: 0,
-            file_hash: Hash::from_str("d74981efa70a0c880b8d8c1985d075dbcbf679b99a5f9914e5aaf96b831a9e24").unwrap(),
+            file_hash: Hash::from_str(
+                "d74981efa70a0c880b8d8c1985d075dbcbf679b99a5f9914e5aaf96b831a9e24",
+            )
+            .unwrap(),
         };
 
         let result = copier.try_copy(file.path(), &metadata).await;
@@ -201,13 +211,19 @@ mod tests {
             file_size_bytes: 11,
             file_modified_time: 0,
             file_created_time: 0,
-            file_hash: Hash::from_str("d74981efa70a0c880b8d8c1985d075dbcbf679b99a5f9914e5aaf96b831a9e24").unwrap(),
+            file_hash: Hash::from_str(
+                "d74981efa70a0c880b8d8c1985d075dbcbf679b99a5f9914e5aaf96b831a9e24",
+            )
+            .unwrap(),
         };
 
         let result = copier.try_copy(file.path(), &metadata).await.unwrap();
 
         assert_matches!(result, FileCopyResult::Copied);
-        assert_eq!(std::fs::read_to_string(existing_dest.path()).unwrap(), "hello world");
+        assert_eq!(
+            std::fs::read_to_string(existing_dest.path()).unwrap(),
+            "hello world"
+        );
     }
 
     #[test]
