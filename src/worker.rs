@@ -1,4 +1,4 @@
-use crate::copying::{Copier, FileCopyResult};
+use crate::copying::{CopyOrNoop, FileCopyResult};
 use crate::db::{Db, GetSourceHashResult};
 use crate::hashing::{Hash, Hasher};
 use crate::models::FileMetadata;
@@ -11,12 +11,12 @@ use tokio::fs;
 pub struct Worker {
     db: Db,
     hasher: Hasher,
-    copier: Option<Copier>,
+    copier: CopyOrNoop,
     no_cache: bool,
 }
 
 impl Worker {
-    pub fn new(db: &Db, hasher: Hasher, copier: Option<Copier>) -> Self {
+    pub fn new(db: &Db, hasher: Hasher, copier: CopyOrNoop) -> Self {
         Self {
             db: db.clone(),
             hasher,
@@ -37,12 +37,8 @@ impl Worker {
     ) -> anyhow::Result<FileResult> {
         let (metadata, cache_result) = self.get_file_metadata(&file, progress).await?;
 
-        let copy_result = if let Some(copier) = &self.copier {
-            progress.set_stage(ProcessorStage::Copying);
-            copier.try_copy(&file, &metadata).await?
-        } else {
-            FileCopyResult::Skipped
-        };
+        progress.set_stage(ProcessorStage::Copying);
+        let copy_result = self.copier.try_copy(&file, &metadata).await?;
 
         Ok::<FileResult, anyhow::Error>(FileResult {
             metadata,

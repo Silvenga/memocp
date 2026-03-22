@@ -1,11 +1,13 @@
 use crate::copying::CopyOp;
+use crate::copying::file_copy_result::FileCopyResult;
+use crate::copying::get_current_time::get_current_time;
 use crate::db::{Db, SeenRecord};
 use crate::models::FileMetadata;
 use crate::templating::Templater;
 use bytesize::ByteSize;
 use humantime::format_duration;
 use std::path::Path;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::Instant;
 
 pub struct Copier {
     db: Db,
@@ -75,20 +77,6 @@ impl Copier {
 
         Ok(FileCopyResult::Copied)
     }
-}
-
-#[derive(Debug)]
-pub enum FileCopyResult {
-    Skipped,
-    Copied,
-}
-
-fn get_current_time() -> u128 {
-    let start = SystemTime::now();
-    let since_the_epoch = start
-        .duration_since(UNIX_EPOCH)
-        .expect("time should be after UNIX EPOCH");
-    since_the_epoch.as_millis()
 }
 
 #[cfg(test)]
@@ -224,13 +212,6 @@ mod tests {
             std::fs::read_to_string(existing_dest.path()).unwrap(),
             "hello world"
         );
-    }
-
-    #[test]
-    fn when_get_current_time_called_then_it_should_return_millis() {
-        let time = get_current_time();
-
-        assert!(time > 0);
     }
 
     #[tokio::test]

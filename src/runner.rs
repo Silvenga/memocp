@@ -1,6 +1,6 @@
 use crate::cleanup::Cleanup;
 use crate::config::Config;
-use crate::copying::Copier;
+use crate::copying::{Copier, CopyOrNoop};
 use crate::db::Db;
 use crate::hashing::Hasher;
 use crate::progress::WorkerProgress;
@@ -50,10 +50,10 @@ impl Runner {
             let copier = Copier::new(&self.db, templater)
                 .with_copy_op(self.config.copy_mode)
                 .with_override_existing(self.config.override_existing);
-            Some(copier)
+            CopyOrNoop::new_copier(copier)
         } else {
             tracing::info!("Load enabled, scanning source directory without copying.");
-            None
+            CopyOrNoop::new_noop(&self.db)
         };
 
         let worker = Worker::new(&self.db, hasher, copier).with_no_cache(self.config.no_cache);
