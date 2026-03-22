@@ -8,11 +8,11 @@ use tracing::Span;
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 use tracing_indicatif::style::ProgressStyle;
 
-pub struct ProcessorProgress {
+pub struct WorkerProgress {
     shared: Arc<Shared>,
 }
 
-impl ProcessorProgress {
+impl WorkerProgress {
     pub fn new(file: impl AsRef<Path>) -> (Self, Span) {
         let shared = Arc::new(Shared {
             stage: ArcSwap::new(ProcessorStage::Preparing.into()),
@@ -30,7 +30,7 @@ impl ProcessorProgress {
             }
         });
 
-        let span = tracing::info_span!("");
+        let span = tracing::info_span!("Worker");
         span.pb_set_style(&style);
         span.pb_set_message(&format!("{}", file.as_ref().display()));
 

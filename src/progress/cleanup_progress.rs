@@ -38,7 +38,7 @@ impl CleanupProgress {
             }
         });
 
-        let span = tracing::info_span!("");
+        let span = tracing::info_span!("Cleanup");
         span.pb_set_style(&style);
 
         (Self { shared }, span)

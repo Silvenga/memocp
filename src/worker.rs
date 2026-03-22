@@ -2,7 +2,7 @@ use crate::copying::{Copier, FileCopyResult};
 use crate::db::{Db, GetSourceHashResult};
 use crate::hashing::{Hash, Hasher};
 use crate::models::FileMetadata;
-use crate::progress::{ProcessorProgress, ProcessorStage};
+use crate::progress::{ProcessorStage, WorkerProgress};
 use humantime::format_duration;
 use std::path::Path;
 use std::time::{Instant, UNIX_EPOCH};
@@ -26,7 +26,7 @@ impl Worker {
     pub async fn process(
         &self,
         file: impl AsRef<Path>,
-        progress: &ProcessorProgress,
+        progress: &WorkerProgress,
     ) -> anyhow::Result<FileResult> {
         let (metadata, cache_result) = self.get_file_metadata(&file, progress).await?;
 
@@ -47,7 +47,7 @@ impl Worker {
     async fn get_file_metadata(
         &self,
         file: impl AsRef<Path>,
-        progress: &ProcessorProgress,
+        progress: &WorkerProgress,
     ) -> anyhow::Result<(FileMetadata, FileCacheResult)> {
         let metadata = fs::metadata(&file).await?;
 
@@ -83,7 +83,7 @@ impl Worker {
         file_size_bytes: u64,
         file_modified_time: u128,
         file_created_time: u128,
-        progress: &ProcessorProgress,
+        progress: &WorkerProgress,
     ) -> anyhow::Result<(Hash, FileCacheResult)> {
         let cache_result = self
             .db

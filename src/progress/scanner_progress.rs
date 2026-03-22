@@ -41,7 +41,7 @@ impl ScannerProgress {
                 }
             });
 
-        let span = tracing::info_span!("");
+        let span = tracing::info_span!("Scanner");
         span.pb_set_style(&style);
 
         (Self { shared }, span)

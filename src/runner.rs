@@ -3,7 +3,7 @@ use crate::config::Config;
 use crate::copying::Copier;
 use crate::db::Db;
 use crate::hashing::Hasher;
-use crate::progress::ProcessorProgress;
+use crate::progress::WorkerProgress;
 use crate::scanner::Scanner;
 use crate::stats::Stats;
 use crate::templating::Templater;
@@ -76,7 +76,7 @@ impl Runner {
                 move |file| {
                     let worker = worker.clone();
                     let stats = stats.clone();
-                    let (progress, span) = ProcessorProgress::new(&file);
+                    let (progress, span) = WorkerProgress::new(&file);
                     async move {
                         match worker.process(&file, &progress).await {
                             Ok(result) => {
