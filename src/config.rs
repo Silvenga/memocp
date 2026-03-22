@@ -18,6 +18,10 @@ pub struct Config {
     #[arg(long)]
     pub load: bool,
 
+    /// Disable cleanup. This process prunes the cache for files that no longer exist.
+    #[arg(long)]
+    pub no_cleanup: bool,
+
     /// The glob pattern to use for filtering files. Ignored if the source path is a file.
     /// Globs are matched case-insensitively.
     #[arg(long)]

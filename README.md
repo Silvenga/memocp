@@ -70,6 +70,8 @@ Arguments:
 Options:
       --load
           Scan the source directory to populate the database of "seen" file hashes without copying files
+      --no-cleanup
+          Disable cleanup. This process prunes the cache for files that no longer exist
       --glob <GLOB>
           The glob pattern to use for filtering files. Ignored if the source path is a file. Globs are matched case-insensitively
   -s, --state-file <STATE_FILE>

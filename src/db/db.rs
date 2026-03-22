@@ -1,9 +1,11 @@
 use crate::db::{CacheRecord, SeenRecord};
 use crate::hashing::Hash;
-use redb::{Database, ReadableDatabase, TableDefinition};
-use std::path::Path;
+use redb::{Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition};
+use std::ffi::OsStr;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use thiserror::Error;
+use tokio::sync::mpsc;
 use tokio::task;
 use tracing::debug;
 
@@ -118,6 +120,40 @@ impl Db {
                 }
                 write_txn.commit()?;
                 Ok(())
+            }
+        })
+        .await?
+    }
+
+    pub async fn get_cached_paths(&self, tx: mpsc::Sender<PathBuf>) -> anyhow::Result<()> {
+        task::spawn_blocking({
+            let db = self.db.clone();
+            move || -> anyhow::Result<()> {
+                let read_txn = db.begin_read()?;
+                let table = read_txn.open_table(CACHE_TABLE)?;
+                for result in table.iter()? {
+                    let (key, _) = result?;
+                    let bytes = key.value();
+                    // SAFETY: We know these bytes came from an OsStr via as_encoded_bytes
+                    let os_str = unsafe { OsStr::from_encoded_bytes_unchecked(bytes) };
+                    let path = PathBuf::from(os_str);
+                    if tx.blocking_send(path).is_err() {
+                        break;
+                    }
+                }
+                Ok(())
+            }
+        })
+        .await?
+    }
+
+    pub async fn count_cached_paths(&self) -> anyhow::Result<u64> {
+        task::spawn_blocking({
+            let db = self.db.clone();
+            move || -> anyhow::Result<u64> {
+                let read_txn = db.begin_read()?;
+                let table = read_txn.open_table(CACHE_TABLE)?;
+                Ok(table.len()?)
             }
         })
         .await?
@@ -306,5 +342,46 @@ mod tests {
         db.remove_seen(hash).await.unwrap();
         let result = db.get_seen(hash).await.unwrap();
         assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    pub async fn when_cached_paths_exist_then_get_cached_paths_should_return_all_paths() {
+        let db = Db::open_in_memory().await.unwrap();
+        let path1 = path::absolute("/test_path_1").unwrap();
+        let path2 = path::absolute("/test_path_2").unwrap();
+        db.set_source_hash(&path1, 10, 20, 30, Hash::default())
+            .await
+            .unwrap();
+        db.set_source_hash(&path2, 11, 22, 33, Hash::default())
+            .await
+            .unwrap();
+
+        let (tx, mut rx) = mpsc::channel(10);
+        db.get_cached_paths(tx).await.unwrap();
+
+        let mut paths = Vec::new();
+        while let Some(path) = rx.recv().await {
+            paths.push(path);
+        }
+
+        assert_eq!(paths.len(), 2);
+        assert!(paths.contains(&path1));
+        assert!(paths.contains(&path2));
+    }
+
+    #[tokio::test]
+    pub async fn when_cached_paths_exist_then_count_cached_paths_should_return_correct_count() {
+        let db = Db::open_in_memory().await.unwrap();
+        let path1 = path::absolute("/test_path_1").unwrap();
+        let path2 = path::absolute("/test_path_2").unwrap();
+        db.set_source_hash(&path1, 10, 20, 30, Hash::default())
+            .await
+            .unwrap();
+        db.set_source_hash(&path2, 11, 22, 33, Hash::default())
+            .await
+            .unwrap();
+
+        let count = db.count_cached_paths().await.unwrap();
+        assert_eq!(count, 2);
     }
 }

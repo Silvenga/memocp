@@ -1,3 +1,4 @@
+use crate::cleanup::Cleanup;
 use crate::config::Config;
 use crate::copying::Copier;
 use crate::db::Db;
@@ -56,6 +57,10 @@ impl Runner {
         };
 
         let worker = Worker::new(&self.db, hasher, copier);
+
+        let cleanup = Cleanup::new(&self.db)
+            .with_concurrency(self.config.concurrency)
+            .with_queue_depth(self.config.queue_depth);
 
         let stats = Arc::from(Stats::default());
 
@@ -130,7 +135,13 @@ impl Runner {
             );
         }
 
-        scanner_result
+        if !self.config.no_cleanup {
+            cleanup.cleanup().await?;
+        } else {
+            tracing::info!("Did not run cleanup, --no-cleanup present.")
+        }
+
+        Ok(())
     }
 
     fn get_source_path(&self) -> io::Result<PathBuf> {

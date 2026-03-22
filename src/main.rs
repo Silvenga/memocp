@@ -7,6 +7,7 @@ use tracing_indicatif::IndicatifLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
+mod cleanup;
 mod config;
 mod copying;
 mod db;
