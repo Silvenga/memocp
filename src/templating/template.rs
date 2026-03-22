@@ -44,3 +44,85 @@ impl Template {
         replacements
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hashing::Hash;
+    use crate::models::FileMetadata;
+
+    #[test]
+    fn when_template_has_no_tokens_then_render_should_return_original_string() {
+        let template = Template::build("path/to/file.txt");
+        let metadata = FileMetadata {
+            file_size_bytes: 0,
+            file_modified_time: 0,
+            file_created_time: 0,
+            file_hash: Hash::empty_hash(),
+        };
+
+        let result = template.render(&metadata).unwrap();
+
+        assert_eq!(result, "path/to/file.txt");
+    }
+
+    #[test]
+    fn when_template_has_one_token_then_render_should_replace_token() {
+        let template = Template::build("path/{year_utc}/file.txt");
+        let metadata = FileMetadata {
+            file_size_bytes: 0,
+            file_modified_time: 1_700_000_000_000_000_000, // 2023-11-14T22:13:20Z
+            file_created_time: 0,
+            file_hash: Hash::empty_hash(),
+        };
+
+        let result = template.render(&metadata).unwrap();
+
+        assert_eq!(result, "path/2023/file.txt");
+    }
+
+    #[test]
+    fn when_template_has_multiple_tokens_then_render_should_replace_all_tokens() {
+        let template = Template::build("path/{year_utc}/{year_utc}/file.txt");
+        let metadata = FileMetadata {
+            file_size_bytes: 0,
+            file_modified_time: 1_700_000_000_000_000_000, // 2023-11-14T22:13:20Z
+            file_created_time: 0,
+            file_hash: Hash::empty_hash(),
+        };
+
+        let result = template.render(&metadata).unwrap();
+
+        assert_eq!(result, "path/2023/2023/file.txt");
+    }
+
+    #[test]
+    fn when_template_has_different_tokens_then_render_should_replace_all_different_tokens() {
+        let template = Template::build("path/{year_utc}/{month_utc}/{day_utc}/file.txt");
+        let metadata = FileMetadata {
+            file_size_bytes: 0,
+            file_modified_time: 1_700_000_000_000_000_000, // 2023-11-14T22:13:20Z
+            file_created_time: 0,
+            file_hash: Hash::empty_hash(),
+        };
+
+        let result = template.render(&metadata).unwrap();
+
+        assert_eq!(result, "path/2023/11/14/file.txt");
+    }
+
+    #[test]
+    fn when_file_modified_time_is_invalid_then_render_should_return_error() {
+        let template = Template::build("path/{year_utc}/file.txt");
+        let metadata = FileMetadata {
+            file_size_bytes: 0,
+            file_modified_time: u128::MAX,
+            file_created_time: 0,
+            file_hash: Hash::empty_hash(),
+        };
+
+        let result = template.render(&metadata);
+
+        assert!(result.is_err());
+    }
+}

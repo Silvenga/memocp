@@ -77,6 +77,7 @@ impl Copier {
     }
 }
 
+#[derive(Debug)]
 pub enum FileCopyResult {
     Skipped,
     Copied,
@@ -88,4 +89,162 @@ fn get_current_time() -> u128 {
         .duration_since(UNIX_EPOCH)
         .expect("time should be after UNIX EPOCH");
     since_the_epoch.as_millis()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hashing::Hash;
+    use assert_fs::TempDir;
+    use assert_fs::prelude::*;
+    use assert_matches::assert_matches;
+    use std::str::FromStr;
+
+    #[tokio::test]
+    async fn when_file_not_seen_then_try_copy_should_copy_file() {
+        let temp = TempDir::new().unwrap();
+        let source_dir = temp.child("source");
+        source_dir.create_dir_all().unwrap();
+        let dest_dir = temp.child("dest");
+        dest_dir.create_dir_all().unwrap();
+        let file = source_dir.child("foo.txt");
+        file.write_str("hello world").unwrap();
+        let db = Db::open_in_memory().await.unwrap();
+        let templater = Templater::new(source_dir.path(), dest_dir.path().to_string_lossy());
+        let copier = Copier::new(&db, templater).with_copy_op(CopyOp::Copy);
+        let metadata = FileMetadata {
+            file_size_bytes: 11,
+            file_modified_time: 0,
+            file_created_time: 0,
+            file_hash: Hash::from_str("d74981efa70a0c880b8d8c1985d075dbcbf679b99a5f9914e5aaf96b831a9e24").unwrap(),
+        };
+
+        let result = copier.try_copy(file.path(), &metadata).await.unwrap();
+
+        assert_matches!(result, FileCopyResult::Copied);
+        assert!(dest_dir.child("foo.txt").exists());
+        assert!(db.exists_seen(metadata.file_hash).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn when_file_already_seen_then_try_copy_should_skip_file() {
+        let temp = TempDir::new().unwrap();
+        let source_dir = temp.child("source");
+        source_dir.create_dir_all().unwrap();
+        let dest_dir = temp.child("dest");
+        dest_dir.create_dir_all().unwrap();
+        let file = source_dir.child("foo.txt");
+        file.write_str("hello world").unwrap();
+        let db = Db::open_in_memory().await.unwrap();
+        let hash = Hash::from_str("d74981efa70a0c880b8d8c1985d075dbcbf679b99a5f9914e5aaf96b831a9e24").unwrap();
+        db.set_seen(hash, SeenRecord { copied_time: 0 }).await.unwrap();
+        let templater = Templater::new(source_dir.path(), dest_dir.path().to_string_lossy());
+        let copier = Copier::new(&db, templater).with_copy_op(CopyOp::Copy);
+        let metadata = FileMetadata {
+            file_size_bytes: 11,
+            file_modified_time: 0,
+            file_created_time: 0,
+            file_hash: hash,
+        };
+
+        let result = copier.try_copy(file.path(), &metadata).await.unwrap();
+
+        assert_matches!(result, FileCopyResult::Skipped);
+        assert!(!dest_dir.child("foo.txt").exists());
+    }
+
+    #[tokio::test]
+    async fn when_override_is_false_and_destination_exists_then_try_copy_should_error() {
+        let temp = TempDir::new().unwrap();
+        let source_dir = temp.child("source");
+        source_dir.create_dir_all().unwrap();
+        let dest_dir = temp.child("dest");
+        dest_dir.create_dir_all().unwrap();
+        let file = source_dir.child("foo.txt");
+        file.write_str("hello world").unwrap();
+        let existing_dest = dest_dir.child("foo.txt");
+        existing_dest.write_str("existing").unwrap();
+        let db = Db::open_in_memory().await.unwrap();
+        let templater = Templater::new(source_dir.path(), dest_dir.path().to_string_lossy());
+        let copier = Copier::new(&db, templater)
+            .with_copy_op(CopyOp::Copy)
+            .with_override_existing(false);
+        let metadata = FileMetadata {
+            file_size_bytes: 11,
+            file_modified_time: 0,
+            file_created_time: 0,
+            file_hash: Hash::from_str("d74981efa70a0c880b8d8c1985d075dbcbf679b99a5f9914e5aaf96b831a9e24").unwrap(),
+        };
+
+        let result = copier.try_copy(file.path(), &metadata).await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn when_override_is_true_and_destination_exists_then_try_copy_should_copy_file() {
+        let temp = TempDir::new().unwrap();
+        let source_dir = temp.child("source");
+        source_dir.create_dir_all().unwrap();
+        let dest_dir = temp.child("dest");
+        dest_dir.create_dir_all().unwrap();
+        let file = source_dir.child("foo.txt");
+        file.write_str("hello world").unwrap();
+        let existing_dest = dest_dir.child("foo.txt");
+        existing_dest.write_str("existing").unwrap();
+        let db = Db::open_in_memory().await.unwrap();
+        let templater = Templater::new(source_dir.path(), dest_dir.path().to_string_lossy());
+        let copier = Copier::new(&db, templater)
+            .with_copy_op(CopyOp::Copy)
+            .with_override_existing(true);
+        let metadata = FileMetadata {
+            file_size_bytes: 11,
+            file_modified_time: 0,
+            file_created_time: 0,
+            file_hash: Hash::from_str("d74981efa70a0c880b8d8c1985d075dbcbf679b99a5f9914e5aaf96b831a9e24").unwrap(),
+        };
+
+        let result = copier.try_copy(file.path(), &metadata).await.unwrap();
+
+        assert_matches!(result, FileCopyResult::Copied);
+        assert_eq!(std::fs::read_to_string(existing_dest.path()).unwrap(), "hello world");
+    }
+
+    #[test]
+    fn when_get_current_time_called_then_it_should_return_millis() {
+        let time = get_current_time();
+
+        assert!(time > 0);
+    }
+
+    #[tokio::test]
+    async fn when_new_called_then_it_should_have_default_values() {
+        let db = Db::open_in_memory().await.unwrap();
+        let templater = Templater::new("/source", "/dest");
+
+        let copier = Copier::new(&db, templater);
+
+        assert_matches!(copier.copy_op, CopyOp::Reflink);
+        assert!(!copier.override_existing);
+    }
+
+    #[tokio::test]
+    async fn when_with_copy_op_called_then_it_should_set_copy_op() {
+        let db = Db::open_in_memory().await.unwrap();
+        let templater = Templater::new("/source", "/dest");
+
+        let copier = Copier::new(&db, templater).with_copy_op(CopyOp::Copy);
+
+        assert_matches!(copier.copy_op, CopyOp::Copy);
+    }
+
+    #[tokio::test]
+    async fn when_with_override_existing_called_then_it_should_set_override_existing() {
+        let db = Db::open_in_memory().await.unwrap();
+        let templater = Templater::new("/source", "/dest");
+
+        let copier = Copier::new(&db, templater).with_override_existing(true);
+
+        assert!(copier.override_existing);
+    }
 }
