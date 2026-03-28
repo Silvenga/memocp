@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/Silvenga/memocp/compare/v1.2.1...v1.3.0) (2026-03-28)
+
+
+### Features
+
+* added compacting cleanup ([8eca90b](https://github.com/Silvenga/memocp/commit/8eca90b57c3d4ca176b4058366bd9305af810917))
+
 ## [1.2.1](https://github.com/Silvenga/memocp/compare/v1.2.0...v1.2.1) (2026-03-28)
 
 
