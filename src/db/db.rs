@@ -1,13 +1,19 @@
 use crate::db::migrations::get_migrations;
 use crate::db::{CacheRecord, SeenRecord};
 use crate::hashing::{Hash, Hasher};
+use bytesize::ByteSize;
+use humantime::format_duration;
+use parking_lot::RwLock;
 use redb::{Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition};
 use std::ffi::OsStr;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Instant;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::task;
+use tracing::Level;
 
 const MIGRATIONS_TABLE: TableDefinition<u32, ()> = TableDefinition::new("v1_migrations");
 const SEEN_TABLE: TableDefinition<Hash, SeenRecord> = TableDefinition::new("v1_seen");
@@ -15,13 +21,15 @@ const CACHE_TABLE: TableDefinition<Hash, CacheRecord> = TableDefinition::new("v2
 
 #[derive(Clone)]
 pub struct Db {
-    db: Arc<Database>,
+    path: Option<PathBuf>,
+    db: Arc<RwLock<Database>>,
 }
 
 impl Db {
-    pub async fn open(database: Database) -> anyhow::Result<Self> {
+    pub async fn open(database: Database, path: Option<PathBuf>) -> anyhow::Result<Self> {
         let db = Self {
-            db: database.into(),
+            path,
+            db: Arc::new(RwLock::new(database)),
         };
         db.migrate().await?;
         Ok(db)
@@ -29,13 +37,17 @@ impl Db {
 
     pub async fn open_file(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         tracing::debug!("Acquiring lock of state database at {:?}.", path.as_ref());
-        Self::open(Database::create(path)?).await
+        Self::open(
+            Database::create(path.as_ref())?,
+            Some(path.as_ref().to_path_buf()),
+        )
+        .await
     }
 
     #[cfg(test)]
     pub async fn open_in_memory() -> anyhow::Result<Self> {
         let db = Database::builder().create_with_backend(redb::backends::InMemoryBackend::new())?;
-        Self::open(db).await
+        Self::open(db, None).await
     }
 
     pub async fn try_get_source_hash(
@@ -52,7 +64,7 @@ impl Db {
             let db = self.db.clone();
             let path = path.as_ref().to_owned();
             move || -> anyhow::Result<GetSourceHashResult> {
-                let read_txn = db.begin_read()?;
+                let read_txn = db.read().begin_read()?;
                 let table = read_txn.open_table(CACHE_TABLE)?;
                 if let Some(result) = table.get(hash_path(&path))? {
                     let record = result.value();
@@ -89,7 +101,7 @@ impl Db {
             let db = self.db.clone();
             let path = path.as_ref().to_owned();
             move || -> anyhow::Result<()> {
-                let write_txn = db.begin_write()?;
+                let write_txn = db.read().begin_write()?;
                 {
                     let mut table = write_txn.open_table(CACHE_TABLE)?;
                     table.insert(
@@ -115,7 +127,7 @@ impl Db {
             let db = self.db.clone();
             let path = path.as_ref().to_owned();
             move || -> anyhow::Result<()> {
-                let write_txn = db.begin_write()?;
+                let write_txn = db.read().begin_write()?;
                 {
                     let mut table = write_txn.open_table(CACHE_TABLE)?;
                     table.remove(hash_path(&path))?;
@@ -131,7 +143,7 @@ impl Db {
         task::spawn_blocking({
             let db = self.db.clone();
             move || -> anyhow::Result<()> {
-                let read_txn = db.begin_read()?;
+                let read_txn = db.read().begin_read()?;
                 let table = read_txn.open_table(CACHE_TABLE)?;
                 for result in table.iter()? {
                     let (_, value) = result?;
@@ -154,7 +166,7 @@ impl Db {
         task::spawn_blocking({
             let db = self.db.clone();
             move || -> anyhow::Result<u64> {
-                let read_txn = db.begin_read()?;
+                let read_txn = db.read().begin_read()?;
                 let table = read_txn.open_table(CACHE_TABLE)?;
                 Ok(table.len()?)
             }
@@ -167,7 +179,7 @@ impl Db {
         task::spawn_blocking({
             let db = self.db.clone();
             move || -> anyhow::Result<Option<SeenRecord>> {
-                let read_txn = db.begin_read()?;
+                let read_txn = db.read().begin_read()?;
                 let table = read_txn.open_table(SEEN_TABLE)?;
                 if let Some(result) = table.get(hash)? {
                     return Ok(Some(result.value()));
@@ -182,7 +194,7 @@ impl Db {
         task::spawn_blocking({
             let db = self.db.clone();
             move || -> anyhow::Result<bool> {
-                let read_txn = db.begin_read()?;
+                let read_txn = db.read().begin_read()?;
                 let table = read_txn.open_table(SEEN_TABLE)?;
                 Ok(table.get(hash)?.is_some())
             }
@@ -194,7 +206,7 @@ impl Db {
         task::spawn_blocking({
             let db = self.db.clone();
             move || -> anyhow::Result<()> {
-                let write_txn = db.begin_write()?;
+                let write_txn = db.read().begin_write()?;
                 {
                     let mut table = write_txn.open_table(SEEN_TABLE)?;
                     table.insert(file_hash, &record)?;
@@ -211,7 +223,7 @@ impl Db {
         task::spawn_blocking({
             let db = self.db.clone();
             move || -> anyhow::Result<()> {
-                let write_txn = db.begin_write()?;
+                let write_txn = db.read().begin_write()?;
                 {
                     let mut table = write_txn.open_table(SEEN_TABLE)?;
                     table.remove(hash)?;
@@ -227,7 +239,7 @@ impl Db {
         task::spawn_blocking({
             let db = self.db.clone();
             move || -> anyhow::Result<bool> {
-                let write_txn = db.begin_write()?;
+                let write_txn = db.read().begin_write()?;
                 {
                     let mut migrations_table = write_txn.open_table(MIGRATIONS_TABLE)?;
 
@@ -255,6 +267,33 @@ impl Db {
                 }
                 write_txn.commit()?;
                 Ok(true)
+            }
+        })
+        .await?
+    }
+
+    pub async fn compact(&mut self) -> anyhow::Result<()> {
+        // Only really mut for semantics.
+        task::spawn_blocking({
+            let db = self.db.clone();
+            let path = self.path.clone();
+            move || -> anyhow::Result<()> {
+                let start_time = Instant::now();
+
+                let mut db = db.write();
+                db.compact()?;
+
+                if let Some(path) = path
+                    && tracing::enabled!(Level::INFO)
+                {
+                    let db_size_bytes = fs::metadata(&path)?.len();
+                    tracing::info!(
+                        "Compacted database to {} after {}.",
+                        ByteSize::b(db_size_bytes),
+                        format_duration(start_time.elapsed())
+                    );
+                }
+                Ok(())
             }
         })
         .await?

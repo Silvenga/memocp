@@ -28,11 +28,11 @@ pub struct Runner {
 
 impl Runner {
     pub async fn new(config: Config) -> Result<Self, Box<dyn Error>> {
-        let db = Db::open_file(config.state_file.clone()).await?;
+        let db = Db::open_file(&config.state_file).await?;
         Ok(Self { config, db })
     }
 
-    pub async fn run(&self) -> anyhow::Result<()> {
+    pub async fn run(&mut self) -> anyhow::Result<()> {
         let source_path = self.get_source_path()?;
 
         let scanner = Scanner::new(&source_path)
@@ -137,6 +137,7 @@ impl Runner {
 
         if !self.config.no_cleanup {
             cleanup.cleanup().await?;
+            self.db.compact().await?;
         } else {
             tracing::info!("Did not run cleanup, --no-cleanup present.")
         }

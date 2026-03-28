@@ -52,7 +52,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     log_panics::init();
 
-    let runner = Runner::new(config).await?;
+    let mut runner = Runner::new(config).await?;
 
     tokio::select! {
         result = runner.run() => {
