@@ -31,3 +31,36 @@ impl<R> Future for CancellableJoinHandle<R> {
         Pin::new(&mut self.handle).poll(cx)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+    use tokio::sync::oneshot;
+
+    #[tokio::test]
+    async fn when_task_completes_then_it_should_return_result() {
+        let task = |_| 42;
+
+        let handle = spawn_blocking_with_cancellation(task);
+        let result = handle.await.unwrap();
+
+        assert_eq!(result, 42);
+    }
+
+    #[tokio::test]
+    async fn when_handle_is_dropped_then_token_should_be_cancelled() {
+        let (tx, rx) = oneshot::channel();
+        let handle = spawn_blocking_with_cancellation(move |token| {
+            while !token.is_cancelled() {
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            let _ = tx.send(());
+        });
+
+        drop(handle);
+
+        let result = tokio::time::timeout(Duration::from_secs(5), rx).await;
+        assert!(result.is_ok());
+    }
+}
