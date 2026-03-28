@@ -25,8 +25,6 @@ impl CopyOp {
             let destination = destination.as_ref().to_path_buf();
             let op = *self;
             move || {
-                let _span = tracing::trace_span!("Copying file").entered();
-
                 if !override_existing && fs::exists(&destination)? {
                     return Err(anyhow!("Destination file already exists."));
                 }
