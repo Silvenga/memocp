@@ -1,6 +1,6 @@
 # memocp
 
-> **Never organize the same file twice.** A blazing-fast, stateful copy CLI that remembers what you've copied.
+> **Never organize the same file twice.** A copy tool that remembers what you've copied.
 
 `memocp` is a content-aware file copying tool built in Rust, designed for massive data curation pipelines. Instead of
 relying on file names or modification dates, `memocp` uses cryptographic
@@ -18,7 +18,7 @@ Say you pull new "incoming" files from a variety of sources to a central reposit
 encounter duplicates. You might spend hours reviewing, organizing, or deleting 100's of gigabytes of files, only for
 those exact same files to be re-downloaded in a new batch under different names, days or even years later.
 
-By running `memocp` on incoming directories, you can ensure strictly out-of-band indexing (maybe a new sentence).
+By running `memocp` on incoming directories, you can ensure the incoming files are actually new.
 Once a file is copied, it is remembered in the database - a **memo**rized-**c**o**p**y.
 
 ### Features
@@ -28,12 +28,12 @@ Once a file is copied, it is remembered in the database - a **memo**rized-**c**o
 * **Efficient:** Resumes from the last processed file by maintaining a persistent cache of source files and their
   hashes, so it doesn't need to rehash everything on every run.
 * **Safe:** Designed to be crash-safe. Files are copied to a hidden temporary file and then atomically renamed to the
-  final destination (an atomic operation),
+  final destination,
   and all database operations are ACID (using [redb](https://github.com/cberner/redb)).
 * **Fast:** Optimized for multithreaded network file systems but scales to local
-  hardware limits. Uses multiple threads to perform IO operations concurrently to increase throughput on high-latency
+  hardware limits. Uses multiple threads to perform IO operations to increase throughput on high-latency
   filesystems like CephFS. Easily hits 4+ GiB/s when hashing on a local NVMe drive (Windows 11, NTFS, NVMe).
-* **Zero-Copy Reflinking:** Defaults to `reflink` mode (for CoW filesystems BTRFS, ZFS, XFS, APFS, ReFS), which enables
+* **Zero-Copy Reflinking:** Defaults to `reflink` mode (BTRFS, ZFS, XFS, APFS, ReFS), which enables
   shallow coping nearly instantly. Falls back to standard copy if needed.
 * **Templated Destination:** Automatically copy source files into year/month/day folder hierarchies to avoid
   naming-conflicts (while maintaining the original file name and folder prefix).
@@ -80,7 +80,8 @@ memocp /path/to/source /path/to/destination/{year_utc}/{month_utc}/{day_utc}
 A file at `/path/to/source/holiday/photo.jpg`, last modified on December 25, 2023, would be copied to
 `/path/to/destination/2023/12/25/holiday/photo.jpg`.
 
-By default, the database will be stored in `./memocp.db`.
+By default, the database will be stored in `./memocp.db`. A database for 20 TiB of files typically requires roughly 20
+MiB.
 
 ## Usage
 
@@ -143,6 +144,6 @@ The destination path can contain the following variables:
 - Hidden files are considered by default.
 - Actually tries to handle paths that have invalid UTF-8 characters. That was a pain to code.
 - Source files are cached by (creation time, modified time, file size).
-- Canceling the process with `CTRL+C` will trigger a graceful shutdown, outstanding database and copy operations will be
-  completed. Hashing will be canceled. Forcefully killing the process will leave the temporary files in place, database
-  operations will be rolled back on the next run.
+- `CTRL+C` gracefully stops the process. Hashing will be canceled, but outstanding database and copy operations will
+  complete. Forcefully killing the process will leave the temporary files in place, database operations will be rolled
+  back on the next run.
