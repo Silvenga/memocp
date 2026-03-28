@@ -1,5 +1,6 @@
+use crate::db::migrations::get_migrations;
 use crate::db::{CacheRecord, SeenRecord};
-use crate::hashing::Hash;
+use crate::hashing::{Hash, Hasher};
 use redb::{Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
@@ -7,10 +8,10 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::task;
-use tracing::debug;
 
+const MIGRATIONS_TABLE: TableDefinition<u32, ()> = TableDefinition::new("v1_migrations");
 const SEEN_TABLE: TableDefinition<Hash, SeenRecord> = TableDefinition::new("v1_seen");
-const CACHE_TABLE: TableDefinition<&[u8], CacheRecord> = TableDefinition::new("v1_cache");
+const CACHE_TABLE: TableDefinition<Hash, CacheRecord> = TableDefinition::new("v2_cache");
 
 #[derive(Clone)]
 pub struct Db {
@@ -22,12 +23,12 @@ impl Db {
         let db = Self {
             db: database.into(),
         };
-        db.create_tables().await?;
+        db.migrate().await?;
         Ok(db)
     }
 
     pub async fn open_file(path: impl AsRef<Path>) -> anyhow::Result<Self> {
-        debug!("Acquiring lock of state database at {:?}.", path.as_ref());
+        tracing::debug!("Acquiring lock of state database at {:?}.", path.as_ref());
         Self::open(Database::create(path)?).await
     }
 
@@ -53,23 +54,23 @@ impl Db {
             move || -> anyhow::Result<GetSourceHashResult> {
                 let read_txn = db.begin_read()?;
                 let table = read_txn.open_table(CACHE_TABLE)?;
-                if let Some(result) = table.get(path.as_os_str().as_encoded_bytes())? {
+                if let Some(result) = table.get(hash_path(&path))? {
                     let record = result.value();
                     if record.file_size_bytes == file_size_bytes
                         && record.file_modified_time == file_modified_time
                         && record.file_created_time == file_created_time
                     {
                         let file_hash = record.file_hash;
-                        debug!(
+                        tracing::debug!(
                             "[{path:?}]: Found matching source hash {}.",
                             file_hash.as_string()
                         );
                         return Ok(GetSourceHashResult::Hit { hash: file_hash });
                     }
-                    debug!("[{path:?}]: File modified.");
+                    tracing::debug!("[{path:?}]: File modified.");
                     return Ok(GetSourceHashResult::Modified);
                 }
-                debug!("[{path:?}]: No matching source hash found.");
+                tracing::debug!("[{path:?}]: No matching source hash found.");
                 Ok(GetSourceHashResult::Miss)
             }
         })
@@ -92,12 +93,13 @@ impl Db {
                 {
                     let mut table = write_txn.open_table(CACHE_TABLE)?;
                     table.insert(
-                        path.as_os_str().as_encoded_bytes(),
+                        hash_path(&path),
                         &CacheRecord {
                             file_size_bytes,
                             file_modified_time,
                             file_created_time,
                             file_hash,
+                            file_path: path.as_os_str().as_encoded_bytes().to_vec(),
                         },
                     )?;
                 }
@@ -116,7 +118,7 @@ impl Db {
                 let write_txn = db.begin_write()?;
                 {
                     let mut table = write_txn.open_table(CACHE_TABLE)?;
-                    table.remove(path.as_os_str().as_encoded_bytes())?;
+                    table.remove(hash_path(&path))?;
                 }
                 write_txn.commit()?;
                 Ok(())
@@ -132,10 +134,11 @@ impl Db {
                 let read_txn = db.begin_read()?;
                 let table = read_txn.open_table(CACHE_TABLE)?;
                 for result in table.iter()? {
-                    let (key, _) = result?;
-                    let bytes = key.value();
+                    let (_, value) = result?;
+                    let record = value.value();
                     // SAFETY: We know these bytes came from an OsStr via as_encoded_bytes
-                    let os_str = unsafe { OsStr::from_encoded_bytes_unchecked(bytes) };
+                    let os_str =
+                        unsafe { OsStr::from_encoded_bytes_unchecked(record.file_path.as_slice()) };
                     let path = PathBuf::from(os_str);
                     if tx.blocking_send(path).is_err() {
                         break;
@@ -220,19 +223,46 @@ impl Db {
         .await?
     }
 
-    pub async fn create_tables(&self) -> anyhow::Result<()> {
+    pub async fn migrate(&self) -> anyhow::Result<bool> {
         task::spawn_blocking({
             let db = self.db.clone();
-            move || -> anyhow::Result<()> {
+            move || -> anyhow::Result<bool> {
                 let write_txn = db.begin_write()?;
-                write_txn.open_table(SEEN_TABLE)?;
-                write_txn.open_table(CACHE_TABLE)?;
+                {
+                    let mut migrations_table = write_txn.open_table(MIGRATIONS_TABLE)?;
+
+                    let needed_migrations = {
+                        let mut needed_migrations = Vec::new();
+                        let possible_migrations = get_migrations();
+                        for migration in possible_migrations {
+                            let missing = migrations_table.get(migration.version())?.is_none();
+                            if missing {
+                                needed_migrations.push(migration);
+                            }
+                        }
+                        needed_migrations
+                    };
+
+                    if needed_migrations.is_empty() {
+                        return Ok(false);
+                    }
+
+                    for migration in needed_migrations {
+                        tracing::debug!("Running migration {}.", migration);
+                        migration.up(&write_txn)?;
+                        migrations_table.insert(migration.version(), &())?;
+                    }
+                }
                 write_txn.commit()?;
-                Ok(())
+                Ok(true)
             }
         })
         .await?
     }
+}
+
+fn hash_path(path: impl AsRef<Path>) -> Hash {
+    Hasher::hash_bytes(path.as_ref().as_os_str().as_encoded_bytes())
 }
 
 #[derive(Error, Debug)]
@@ -383,5 +413,12 @@ mod tests {
 
         let count = db.count_cached_paths().await.unwrap();
         assert_eq!(count, 2);
+    }
+
+    #[tokio::test]
+    pub async fn when_migrations_not_needed_then_migrate_should_return_false() {
+        let db = Db::open_in_memory().await.unwrap();
+        let migrated = db.migrate().await.unwrap();
+        assert!(!migrated);
     }
 }

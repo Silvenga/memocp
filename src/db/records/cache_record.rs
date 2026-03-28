@@ -8,6 +8,7 @@ pub struct CacheRecord {
     pub file_modified_time: u128,
     pub file_created_time: u128,
     pub file_hash: Hash,
+    pub file_path: Vec<u8>,
 }
 
 impl Value for CacheRecord {
@@ -22,18 +23,18 @@ impl Value for CacheRecord {
     where
         Self: 'a,
     {
-        borsh::from_slice(data).expect("Failed to deserialize SeenRecord")
+        borsh::from_slice(data).expect("Failed to deserialize CacheRecord")
     }
 
     fn as_bytes<'a, 'b: 'a>(value: &'a Self::SelfType<'b>) -> Self::AsBytes<'a>
     where
         Self: 'b,
     {
-        borsh::to_vec(value).expect("Failed to serialize SeenRecord")
+        borsh::to_vec(value).expect("Failed to serialize CacheRecord")
     }
 
     fn type_name() -> TypeName {
-        TypeName::new("memocp::SeenRecord")
+        TypeName::new("memocp::CacheRecord")
     }
 }
 
@@ -48,6 +49,7 @@ mod tests {
             file_modified_time: 456,
             file_created_time: 789,
             file_hash: Hash::default(),
+            file_path: vec![1, 2, 3],
         };
         let serialized = CacheRecord::as_bytes(&record);
         let deserialized = CacheRecord::from_bytes(&serialized);

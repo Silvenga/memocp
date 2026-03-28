@@ -92,6 +92,12 @@ impl Hasher {
 
         Ok(hasher.finalize().into())
     }
+
+    pub fn hash_bytes(data: &[u8]) -> Hash {
+        let mut hasher = Blake3Hasher::new();
+        hasher.update(data);
+        hasher.finalize().into()
+    }
 }
 
 #[cfg(test)]
