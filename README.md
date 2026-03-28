@@ -1,5 +1,7 @@
 # memocp
 
+![Elephant Logo](./docs/logo.webp)
+
 > **Never organize the same file twice.** A copy tool that remembers what you've copied.
 
 `memocp` is a content-aware file copying tool built in Rust, designed for massive data curation pipelines. Instead of
