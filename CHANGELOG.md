@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/Silvenga/memocp/compare/v1.2.0...v1.2.1) (2026-03-28)
+
+
+### Bug Fixes
+
+* fixed progress when verbose is enabled ([d870807](https://github.com/Silvenga/memocp/commit/d870807dfc4ed4388046e4c266f24e5c2f60048f))
+* reduced fragmentation of the redb btree for cache ([6a323bf](https://github.com/Silvenga/memocp/commit/6a323bf856a50cbac158fb41caa2ade8db5fbc72))
+
 ## [1.2.0](https://github.com/Silvenga/memocp/compare/v1.1.0...v1.2.0) (2026-03-22)
 
 
